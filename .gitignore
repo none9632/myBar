@@ -1,0 +1,17 @@
+# сгенерированные TS-типы
+@girs/
+
+# артефакты сборки
+dist/
+*.bundle.js
+
+# npm
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
