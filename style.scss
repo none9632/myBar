@@ -1,20 +1,84 @@
-// https://gitlab.gnome.org/GNOME/gtk/-/blob/gtk-3-24/gtk/theme/Adwaita/_colors-public.scss
-$fg-color: #{"@theme_fg_color"};
-$bg-color: #{"@theme_bg_color"};
+@use "sass:map";
 
-window.Bar {
+// ── Themes ───────────────────────────────────────────────────────────────────
+
+$themes: (
+  "catppuccin-mocha": (
+    "bg":        rgba(30, 30, 46, 0.92),
+    "fg":        #cdd6f4,
+    "subtext":   #a6adc8,
+    "active-bg": rgba(137, 180, 250, 0.18),
+    "radius":    10px,
+  )
+);
+
+// ── Active theme (change this to switch) ─────────────────────────────────────
+
+$active-theme: "catppuccin-mocha";
+
+// ── Extract variables ─────────────────────────────────────────────────────────
+
+$t:         map.get($themes, $active-theme);
+$bg:        map.get($t, "bg");
+$fg:        map.get($t, "fg");
+$subtext:   map.get($t, "subtext");
+$active-bg: map.get($t, "active-bg");
+$radius:    map.get($t, "radius");
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+window.LeftPanel,
+window.RightPanel {
   background: transparent;
-  color: $fg-color;
+  color: $fg;
   font-weight: bold;
+}
 
-  > centerbox {
-    background: $bg-color;
-    border-radius: 10px;
-    margin: 8px;
+$content-height: 28px; // одинаковая высота содержимого обеих панелей
+
+left-panel-inner,
+right-panel-inner {
+  background: $bg;
+  border-radius: $radius;
+  margin: 8px;
+  padding: 2px 8px;
+  min-height: $content-height;
+  color: $fg;
+}
+
+workspaces {
+  workspace-btn {
+    border-radius: calc(#{$radius} - 2px);
+    min-width: $content-height;
+    min-height: $content-height;
+    margin: 0 2px;
+    padding: 0;
+    color: $fg;
+
+    &.active {
+      background: $active-bg;
+    }
+  }
+}
+
+kb-layout,
+updates,
+battery {
+  padding: 0 2px;
+}
+
+kb-icon,
+updates-icon {
+  color: $subtext;
+}
+
+clock {
+  time {
+    font-weight: bold;
+    color: $fg;
   }
 
-  button {
-    border-radius: 8px;
-    margin: 2px;
+  date {
+    color: $subtext;
   }
 }
