@@ -5,10 +5,11 @@ import { createPoll } from "ags/time"
 import { createBinding, createState, onCleanup } from "gnim"
 import Battery from "gi://AstalBattery?version=0.1"
 import Hyprland from "gi://AstalHyprland?version=0.1"
+import QuickSettingsWindow from "./QuickSettings"
 
-// Команда для подсчёта доступных обновлений (репозитории + AUR).
+// Command to count available updates (official repos + AUR).
 const UPDATE_CHECK_CMD = ["bash", "-c", "(checkupdates; yay -Qua) 2>/dev/null | wc -l"]
-const UPDATE_INTERVAL = 30 * 60 * 1000 // 30 минут
+const UPDATE_INTERVAL = 30 * 60 * 1000 // 30 minutes
 
 function shortLayout(layout: string): string {
   return layout.replace(/\s*\(.*\)/, "").slice(0, 2).toUpperCase()
@@ -25,7 +26,7 @@ function KbLayout() {
   )
   onCleanup(() => hypr.disconnect(id))
 
-  // Начальное значение: текущая раскладка основной клавиатуры.
+  // Initial value: current layout of the main keyboard.
   execAsync([
     "bash",
     "-c",
@@ -85,6 +86,14 @@ function Clock() {
 
 export default function RightPanel(gdkmonitor: Gdk.Monitor) {
   const { TOP, RIGHT } = Astal.WindowAnchor
+  const [qsOpen, setQsOpen] = createState(false)
+
+  // Pinned overlay window for Quick Settings (self-registers via application={app}).
+  QuickSettingsWindow({
+    gdkmonitor,
+    visible: qsOpen,
+    close: () => setQsOpen(false),
+  })
 
   return (
     <window
@@ -102,6 +111,9 @@ export default function RightPanel(gdkmonitor: Gdk.Monitor) {
         <Updates />
         <BatteryWidget />
         <Clock />
+        <button cssName="qs-button" onClicked={() => setQsOpen(!qsOpen.peek())}>
+          <image iconName="view-grid-symbolic" />
+        </button>
       </box>
     </window>
   )

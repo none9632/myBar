@@ -8,6 +8,8 @@ $themes: (
     "fg":        #cdd6f4,
     "subtext":   #a6adc8,
     "active-bg": rgba(137, 180, 250, 0.18),
+    "accent":    #89b4fa,
+    "accent-fg": #1e1e2e,
     "radius":    10px,
   )
 );
@@ -23,6 +25,8 @@ $bg:        map.get($t, "bg");
 $fg:        map.get($t, "fg");
 $subtext:   map.get($t, "subtext");
 $active-bg: map.get($t, "active-bg");
+$accent:    map.get($t, "accent");
+$accent-fg: map.get($t, "accent-fg");
 $radius:    map.get($t, "radius");
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -34,7 +38,7 @@ window.RightPanel {
   font-weight: bold;
 }
 
-$content-height: 28px; // одинаковая высота содержимого обеих панелей
+$content-height: 28px; // shared content height for both panels
 
 left-panel-inner,
 right-panel-inner {
@@ -80,5 +84,110 @@ clock {
 
   date {
     color: $subtext;
+  }
+}
+
+// ── Quick Settings button ─────────────────────────────────────────────────────
+
+qs-button {
+  padding: 0 6px;
+  border-radius: calc(#{$radius} - 2px);
+  color: $fg;
+
+  image {
+    -gtk-icon-size: 18px;
+  }
+
+  &:hover {
+    background: $active-bg;
+  }
+}
+
+// ── Settings overlay ──────────────────────────────────────────────────────────
+
+window.QuickSettings {
+  background: transparent;
+}
+
+quick-settings-wrapper {
+  background: $bg;
+  border-radius: $radius;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+quick-settings {
+  min-width: 320px;
+
+  qs-toggle {
+    border-radius: calc(#{$radius} - 2px);
+    padding: 6px 14px;
+    min-height: 42px;
+    background: $active-bg;
+    color: $subtext;
+
+    qs-toggle-icon {
+      -gtk-icon-size: 22px;
+    }
+
+    qs-toggle-label {
+      font-size: 1.05em;
+      font-weight: bold;
+    }
+
+    qs-toggle-sublabel {
+      font-size: 0.8em;
+      opacity: 0.75;
+    }
+
+    &.active {
+      background: $accent;
+      color: $accent-fg;
+    }
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  qs-slider {
+    padding: 6px 2px;
+
+    qs-slider-icon {
+      -gtk-icon-size: 18px;
+      color: $subtext;
+      min-width: 40px;
+    }
+
+    qs-slider-value {
+      color: $subtext;
+      min-width: 40px;
+    }
+
+    qs-scale {
+      min-height: 18px;
+
+      trough {
+        min-height: 18px;
+        border-radius: 6px;
+        background: $active-bg;
+
+        highlight {
+          background: $accent;
+          border-radius: 6px;
+        }
+
+        // Knob: rounded rectangle in the fill color, slightly larger than the
+        // trough, outlined by a soft shadow instead of a border line.
+        slider {
+          min-width: 18px;
+          min-height: 24px;
+          margin: -3px 0;
+          border-radius: 6px;
+          background: $accent;
+          box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.5);
+        }
+      }
+    }
   }
 }
