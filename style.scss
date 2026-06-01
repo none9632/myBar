@@ -10,7 +10,7 @@ $themes: (
     "active-bg": rgba(137, 180, 250, 0.18),
     "accent":    #89b4fa,
     "accent-fg": #1e1e2e,
-    "radius":    10px,
+    "radius":    8px,
   )
 );
 
@@ -189,5 +189,215 @@ quick-settings {
         }
       }
     }
+  }
+}
+
+// ── Wi-Fi detail page ─────────────────────────────────────────────────────────
+
+wifi-page {
+  min-width: 320px;
+
+  wifi-header {
+    wifi-back {
+      padding: 4px 8px;
+      border-radius: calc(#{$radius} - 2px);
+      color: $fg;
+
+      &:hover {
+        background: $active-bg;
+      }
+    }
+
+    wifi-title {
+      font-size: 1.15em;
+      font-weight: bold;
+      color: $fg;
+    }
+
+    // Custom on/off toggle (a styled button), echoing the slider design. We
+    // deliberately avoid GtkSwitch: it only flips its `:checked` state — and
+    // thus the track colour — AFTER the knob finishes its hard-coded 100ms
+    // slide, so the colour always lagged the knob. Here a single `.on` class
+    // drives both the knob's margin and the track colour with the same 100ms
+    // ease-out transition, so they move in perfect lockstep.
+    wifi-switch {
+      min-width: 40px;
+      min-height: 16px;
+      padding: 0;
+      border: none;
+      box-shadow: none;
+      border-radius: 4px;
+      background: $active-bg;
+      transition: background-color 100ms ease-out;
+
+      &.on {
+        background: $accent;
+      }
+
+      // Knob: rounded rectangle in the fill colour with a soft shadow, taller
+      // than the track so it sticks out. Only its horizontal position moves —
+      // margin-left animates it from one side to the other, in step with the
+      // track colour above.
+      knob {
+        min-width: 16px;
+        min-height: 20px;
+        margin: -2px 0;
+        border-radius: 4px;
+        background: $accent;
+        box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.5);
+        transition: margin-left 100ms ease-out;
+      }
+
+      // Travel = track width − knob width (40 − 16), so the knob sits flush
+      // against the left edge when off and the right edge when on.
+      &.on knob {
+        margin-left: 24px;
+      }
+    }
+  }
+
+  wifi-list {
+    background: transparent;
+
+    wifi-row {
+      padding: 8px 10px;
+      border-radius: calc(#{$radius} - 2px);
+      background: transparent;
+      color: $fg;
+
+      image {
+        -gtk-icon-size: 18px;
+      }
+
+      wifi-band {
+        font-size: 0.75em;
+        color: $subtext;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: $active-bg;
+      }
+
+      wifi-lock {
+        -gtk-icon-size: 14px;
+        color: $subtext;
+      }
+
+      spinner {
+        min-width: 16px;
+        min-height: 16px;
+        color: $accent;
+      }
+
+      &:hover {
+        background: $active-bg;
+      }
+
+      &.connected {
+        background: $accent;
+        color: $accent-fg;
+
+        wifi-band {
+          color: $accent-fg;
+          background: rgba(0, 0, 0, 0.15);
+        }
+
+        spinner {
+          color: $accent-fg;
+        }
+
+        &:hover {
+          background: $accent;
+        }
+      }
+    }
+
+    wifi-password {
+      padding: 4px 10px 8px;
+
+      entry {
+        border-radius: calc(#{$radius} - 2px);
+
+        &.error {
+          box-shadow: inset 0 0 0 1px #f38ba8;
+          animation: wrong-shake 0.4s ease both;
+
+          > text > placeholder {
+            color: #f38ba8;
+          }
+        }
+      }
+
+      wifi-connect {
+        padding: 4px 14px;
+        border-radius: calc(#{$radius} - 2px);
+        background: $accent;
+        color: $accent-fg;
+        font-weight: bold;
+      }
+    }
+  }
+
+  wifi-ip {
+    padding: 4px 2px;
+    color: $subtext;
+
+    image {
+      -gtk-icon-size: 16px;
+    }
+
+    wifi-ip-value {
+      font-weight: bold;
+      color: $fg;
+    }
+  }
+}
+
+// ── Network context menu (inline) ─────────────────────────────────────────────
+
+wifi-menu {
+  padding: 2px 8px 6px 36px;
+
+  wifi-menu-item {
+    padding: 6px 12px;
+    border-radius: calc(#{$radius} - 4px);
+    color: $fg;
+
+    image {
+      -gtk-icon-size: 16px;
+    }
+
+    &:hover {
+      background: $active-bg;
+    }
+  }
+}
+
+// Horizontal shake for a rejected password. Opposite left/right margins keep
+// the width constant while translating the field, since GTK4 CSS has no transform.
+@keyframes wrong-shake {
+  0%,
+  100% {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  15% {
+    margin-left: 7px;
+    margin-right: -7px;
+  }
+  30% {
+    margin-left: -7px;
+    margin-right: 7px;
+  }
+  45% {
+    margin-left: 5px;
+    margin-right: -5px;
+  }
+  60% {
+    margin-left: -5px;
+    margin-right: 5px;
+  }
+  75% {
+    margin-left: 3px;
+    margin-right: -3px;
   }
 }
