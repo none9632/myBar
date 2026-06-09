@@ -6,6 +6,7 @@ import { BluetoothToggle, BluetoothPage } from "./quicksettings/bluetooth"
 import { VpnToggle, VpnPage } from "./quicksettings/vpn"
 import { MicToggle, VolumeSlider } from "./quicksettings/audio"
 import { PowerToggle, BrightnessSlider } from "./quicksettings/system"
+import { AirplaneToggle } from "./quicksettings/airplane"
 
 // ── Compose ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ function QuickSettingsContent(props: {
         <box orientation={Gtk.Orientation.VERTICAL} spacing={8}>
           <VpnToggle onClick={props.onVpnClick} />
           <MicToggle />
+          <AirplaneToggle />
         </box>
       </box>
 
