@@ -365,40 +365,39 @@ detail-page {
 // ── Shared on/off toggle ──────────────────────────────────────────────────────
 // Custom toggle (a styled button) instead of GtkSwitch: GtkSwitch only flips its
 // `:checked` state — and thus the track colour — AFTER the knob finishes its
-// hard-coded 100ms slide, so the colour always lagged the knob. Here a single
-// `.on` class drives both the knob's margin and the track colour with the same
-// 100ms ease-out transition, so they move in perfect lockstep.
+// hard-coded slide, so the colour always lagged the knob. Here a single `.on`
+// class drives both the knob's margin and the track colour with the same
+// transition, so they move in perfect lockstep. A capsule track with a round
+// knob that slides across.
 toggle-switch {
-  min-width: 40px;
-  min-height: 16px;
+  min-width: 44px;
+  min-height: 22px;
   padding: 0;
   border: none;
   box-shadow: none;
-  border-radius: 4px;
+  border-radius: 999px;
   background: $active-bg;
-  transition: background-color 100ms ease-out;
+  transition: background-color 150ms ease;
 
   &.on {
     background: $accent;
   }
 
-  // Knob: rounded rectangle in the fill colour with a soft shadow, taller than
-  // the track so it sticks out. Only its horizontal position moves — margin-left
-  // animates it from one side to the other, in step with the track colour above.
+  // Round knob inset from the capsule edge; only margin-left animates it across.
   knob {
     min-width: 16px;
-    min-height: 20px;
-    margin: -2px 0;
-    border-radius: 4px;
-    background: $accent;
-    box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.5);
-    transition: margin-left 100ms ease-out;
+    min-height: 16px;
+    margin: 3px;
+    border-radius: 999px;
+    background: $fg;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    transition: margin-left 150ms ease;
   }
 
-  // Travel = track width − knob width (40 − 16), so the knob sits flush against
-  // the left edge when off and the right edge when on.
+  // Travel = track width − knob width − right inset (44 − 16 − 3 = 25).
   &.on knob {
-    margin-left: 24px;
+    margin-left: 25px;
+    background: $accent-fg;
   }
 }
 
