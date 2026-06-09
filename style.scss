@@ -334,6 +334,32 @@ detail-page {
       color: $fg;
     }
   }
+
+  // "Add config" button at the foot of the VPN page: an outlined accent button
+  // so it reads as an action rather than a plain label. Fills on hover.
+  vpn-add {
+    margin-top: 4px;
+    padding: 10px;
+    border-radius: calc(#{$radius} - 2px);
+    background: transparent;
+    border: 1px solid $accent;
+    color: $accent;
+    font-weight: bold;
+
+    image {
+      -gtk-icon-size: 16px;
+      color: $accent;
+    }
+
+    &:hover {
+      background: $accent;
+      color: $accent-fg;
+
+      image {
+        color: $accent-fg;
+      }
+    }
+  }
 }
 
 // ── Shared on/off toggle ──────────────────────────────────────────────────────

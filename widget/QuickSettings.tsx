@@ -1,7 +1,10 @@
 import app from "ags/gtk4/app"
 import { Astal, Gtk, Gdk } from "ags/gtk4"
 import Pango from "gi://Pango?version=1.0"
+import GLib from "gi://GLib?version=2.0"
+import Gio from "gi://Gio?version=2.0"
 import { execAsync } from "ags/process"
+import { readFile, writeFile } from "ags/file"
 import { createPoll } from "ags/time"
 import {
   Accessor,
@@ -122,6 +125,247 @@ function WifiToggle(props: { onClick: () => void }) {
   )
 }
 
+// ── VPN (sing-box) ──────────────────────────────────────────────────────────
+// sing-box runs as a system service in TUN mode. We keep a library of VLESS
+// profiles under ~/.config/sing-box/profiles/ and switch the active one by
+// rendering a full config (a fixed template + the profile's outbound) and
+// handing it to the `singbox-ctl` helper, which validates, installs it to
+// /etc/sing-box/config.json and restarts the service. Reading state
+// (`systemctl is-active`) needs no privilege; every mutation goes through the
+// helper, allowed passwordless via /etc/sudoers.d/sing-box.
+
+const VPN_DIR = `${GLib.get_user_config_dir()}/sing-box`
+const VPN_PROFILES_DIR = `${VPN_DIR}/profiles`
+const VPN_RENDERED = `${VPN_DIR}/rendered/active.json`
+const VPN_ACTIVE_FILE = `${VPN_DIR}/active`
+const VPN_SYSTEM_CONFIG = "/etc/sing-box/config.json"
+const SINGBOX_CTL = `${GLib.get_home_dir()}/.local/bin/singbox-ctl`
+
+interface VpnOutbound {
+  type: string
+  tag: string
+  server: string
+  server_port: number
+  uuid: string
+  flow?: string
+  tls?: object
+  transport?: object
+}
+
+interface VpnProfile {
+  id: string
+  name: string
+  link: string
+  outbound: VpnOutbound
+}
+
+// Decode a URL query string into a plain map (gjs lacks a guaranteed
+// URLSearchParams, so parse by hand).
+function parseQuery(query: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const pair of query.replace(/^\?/, "").split("&")) {
+    if (!pair) continue
+    const eq = pair.indexOf("=")
+    const key = decodeURIComponent(eq < 0 ? pair : pair.slice(0, eq))
+    const val = eq < 0 ? "" : decodeURIComponent(pair.slice(eq + 1))
+    out[key] = val
+  }
+  return out
+}
+
+// Parse a `vless://uuid@host:port?params#name` share link into a sing-box
+// outbound. Covers the reality/vision + tls cases (and ws/grpc transport);
+// returns null if the link isn't a recognisable VLESS URL.
+function parseVlessLink(raw: string): VpnProfile | null {
+  const link = raw.trim()
+  const m = link.match(/^vless:\/\/([^@]+)@([^:/?#]+):(\d+)(\?[^#]*)?(#.*)?$/i)
+  if (!m) return null
+  const [, uuid, host, portStr, query = "", hash = ""] = m
+  const p = parseQuery(query)
+  const name = (hash ? decodeURIComponent(hash.slice(1)) : "") || host
+
+  const outbound: VpnOutbound = {
+    type: "vless",
+    tag: "vless-out",
+    server: host,
+    server_port: parseInt(portStr, 10),
+    uuid,
+  }
+  if (p.flow) outbound.flow = p.flow
+
+  const security = p.security || "none"
+  if (security === "reality" || security === "tls") {
+    const tls: Record<string, unknown> = {
+      enabled: true,
+      server_name: p.sni || p.peer || host,
+    }
+    if (p.fp) tls.utls = { enabled: true, fingerprint: p.fp }
+    if (security === "reality") {
+      tls.reality = { enabled: true, public_key: p.pbk || "", short_id: p.sid || "" }
+    }
+    outbound.tls = tls
+  }
+
+  if (p.type === "ws") {
+    const ws: Record<string, unknown> = { type: "ws", path: p.path || "/" }
+    if (p.host) ws.headers = { Host: p.host }
+    outbound.transport = ws
+  } else if (p.type === "grpc") {
+    outbound.transport = { type: "grpc", service_name: p.serviceName || "" }
+  }
+
+  const id = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
+  return { id, name, link, outbound }
+}
+
+// A complete, standalone sing-box config built from the fixed template plus the
+// given outbound. Mirrors the original /etc/sing-box/config.json so existing
+// dns/route behaviour is preserved; only the VLESS server varies.
+function renderVpnConfig(outbound: VpnOutbound): string {
+  const config = {
+    dns: {
+      servers: [
+        { type: "tls", tag: "google", detour: "vless-out", server: "8.8.8.8" },
+        { type: "udp", tag: "local", server: "1.1.1.1" },
+      ],
+      strategy: "ipv4_only",
+    },
+    inbounds: [
+      {
+        type: "tun",
+        address: "172.19.0.1/30",
+        auto_route: true,
+        auto_redirect: true,
+        strict_route: true,
+      },
+    ],
+    outbounds: [
+      { ...outbound, tag: "vless-out" },
+      { type: "direct", tag: "direct" },
+    ],
+    route: {
+      rules: [
+        { action: "sniff" },
+        { protocol: "dns", action: "hijack-dns" },
+        { ip_is_private: true, outbound: "direct" },
+      ],
+      auto_detect_interface: true,
+      default_domain_resolver: "local",
+      final: "vless-out",
+    },
+  }
+  return JSON.stringify(config, null, 2)
+}
+
+function listVpnProfiles(): VpnProfile[] {
+  if (!GLib.file_test(VPN_PROFILES_DIR, GLib.FileTest.IS_DIR)) return []
+  const profiles: VpnProfile[] = []
+  try {
+    const en = Gio.File.new_for_path(VPN_PROFILES_DIR).enumerate_children(
+      "standard::name",
+      Gio.FileQueryInfoFlags.NONE,
+      null,
+    )
+    let info: Gio.FileInfo | null
+    while ((info = en.next_file(null)) !== null) {
+      const fname = info.get_name()
+      if (!fname.endsWith(".json")) continue
+      try {
+        const data = JSON.parse(readFile(`${VPN_PROFILES_DIR}/${fname}`))
+        if (data?.outbound?.server) {
+          profiles.push({
+            id: fname.replace(/\.json$/, ""),
+            name: data.name || data.outbound.server,
+            link: data.link || "",
+            outbound: data.outbound,
+          })
+        }
+      } catch (e) {
+        console.error("vpn profile parse:", fname, "->", String(e))
+      }
+    }
+  } catch (e) {
+    console.error("vpn list profiles:", String(e))
+  }
+  return profiles.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function saveVpnProfile(p: VpnProfile) {
+  writeFile(
+    `${VPN_PROFILES_DIR}/${p.id}.json`,
+    JSON.stringify({ name: p.name, link: p.link, outbound: p.outbound }, null, 2),
+  )
+}
+
+function deleteVpnProfile(id: string) {
+  try {
+    Gio.File.new_for_path(`${VPN_PROFILES_DIR}/${id}.json`).delete(null)
+  } catch (e) {
+    console.error("vpn delete profile:", id, "->", String(e))
+  }
+}
+
+function getActiveVpnId(): string {
+  try {
+    return readFile(VPN_ACTIVE_FILE).trim()
+  } catch {
+    return ""
+  }
+}
+
+// Render the profile's config and ask the helper to validate + install + restart.
+function applyVpnProfile(p: VpnProfile): Promise<string> {
+  writeFile(VPN_RENDERED, renderVpnConfig(p.outbound))
+  writeFile(VPN_ACTIVE_FILE, p.id)
+  return execAsync(["sudo", SINGBOX_CTL, "apply", VPN_RENDERED])
+}
+
+// First-run seeding: lift the VLESS outbound from the live system config into a
+// profile so the user's current server shows up in the list.
+function seedVpnProfiles() {
+  if (listVpnProfiles().length > 0) return
+  try {
+    const cfg = JSON.parse(readFile(VPN_SYSTEM_CONFIG))
+    const ob = (cfg.outbounds || []).find((o: VpnOutbound) => o.type === "vless")
+    if (!ob?.server) return
+    const id = Date.now().toString(36)
+    saveVpnProfile({ id, name: ob.server, link: "", outbound: { ...ob, tag: "vless-out" } })
+    if (!getActiveVpnId()) writeFile(VPN_ACTIVE_FILE, id)
+  } catch (e) {
+    console.error("vpn seed:", String(e))
+  }
+}
+
+function vpnIsActivePoll(): Accessor<boolean> {
+  // `|| true` keeps exit code 0 so an inactive service isn't a failed poll.
+  return createPoll(
+    false,
+    2000,
+    ["bash", "-c", "systemctl is-active sing-box || true"],
+    (out) => out.trim() === "active",
+  )
+}
+
+function VpnToggle(props: { onClick: () => void }) {
+  const active = vpnIsActivePoll()
+  // Subtitle: the server IP of the selected profile (read straight from the
+  // files, no subprocess). Updates when the active config changes on the page.
+  const activeServer = createPoll("", 2000, () => {
+    const id = getActiveVpnId()
+    if (!id) return ""
+    return listVpnProfiles().find((p) => p.id === id)?.outbound.server ?? ""
+  })
+  return (
+    <Toggle
+      icon={active.as((a) => (a ? "network-vpn-symbolic" : "network-vpn-disconnected-symbolic"))}
+      label={active.as((a) => (a ? "Connected" : "Disconnected"))}
+      sublabel={activeServer.as((ip) => ip || "Not connected")}
+      active={active}
+      onClicked={props.onClick}
+    />
+  )
+}
+
 // ── Bluetooth ─────────────────────────────────────────────────────────────────
 
 function BluetoothToggle(props: { onClick: () => void }) {
@@ -235,17 +479,21 @@ function BrightnessSlider() {
 function QuickSettingsContent(props: {
   onWifiClick: () => void
   onBluetoothClick: () => void
+  onVpnClick: () => void
 }) {
   return (
     <box cssName="quick-settings" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
       <box cssName="qs-toggles" spacing={8} homogeneous>
+        {/* Left column: Wi-Fi, Bluetooth, Power. Right column: VPN (next to
+            Wi-Fi), Microphone. */}
         <box orientation={Gtk.Orientation.VERTICAL} spacing={8}>
           <WifiToggle onClick={props.onWifiClick} />
-          <MicToggle />
-        </box>
-        <box orientation={Gtk.Orientation.VERTICAL} spacing={8}>
           <BluetoothToggle onClick={props.onBluetoothClick} />
           <PowerToggle />
+        </box>
+        <box orientation={Gtk.Orientation.VERTICAL} spacing={8}>
+          <VpnToggle onClick={props.onVpnClick} />
+          <MicToggle />
         </box>
       </box>
 
@@ -743,6 +991,275 @@ function BluetoothPage(props: { onBack: () => void }) {
   )
 }
 
+// ── VPN detail page ───────────────────────────────────────────────────────────
+
+function VpnRow(props: {
+  profile: VpnProfile
+  activeId: Accessor<string>
+  onSelect: (p: VpnProfile) => void
+  onDeleted: () => void
+}) {
+  const p = props.profile
+  // Name is held locally so a rename shows immediately: <For> reuses the row by
+  // id and never re-runs with the updated profile object (see [[gnim-with-append-order]]).
+  const [name, setName] = createState(p.name)
+  const [menuOpen, setMenuOpen] = createState(false)
+  const [renaming, setRenaming] = createState(false)
+  const [renameText, setRenameText] = createState(p.name)
+  const isActive = props.activeId.as((id) => id === p.id)
+
+  // Latency is measured on demand, for the active config only. We time a full
+  // HTTP round-trip to a generate_204 endpoint *through* the tunnel — the same
+  // thing Clash/sing-box GUIs report as "ping". A bare TCP/ICMP probe is useless
+  // here: the TUN terminates connections locally, so it answers in ~0-2ms rather
+  // than the real server RTT. null = unreachable. Retries cover the few seconds
+  // the tunnel needs to come up after a restart.
+  const [pingMs, setPingMs] = createState<number | null>(null)
+  const [measuring, setMeasuring] = createState(false)
+
+  function measure(attempt = 0) {
+    setMeasuring(true)
+    if (attempt === 0) setPingMs(null)
+    execAsync([
+      "bash",
+      "-c",
+      "curl -o /dev/null -s -w '%{time_total} %{http_code}' --max-time 6 " +
+        "http://cp.cloudflare.com/generate_204",
+    ])
+      .then((out) => {
+        const [secStr, code] = out.trim().split(/\s+/)
+        const sec = parseFloat(secStr)
+        const ok = (code === "204" || code === "200") && !isNaN(sec) && sec > 0
+        if (ok) {
+          setPingMs(Math.round(sec * 1000))
+          setMeasuring(false)
+        } else if (attempt < 3 && isActive.peek()) {
+          setTimeout(() => measure(attempt + 1), 1500)
+        } else {
+          setPingMs(null)
+          setMeasuring(false)
+        }
+      })
+      .catch(() => {
+        if (attempt < 3 && isActive.peek()) {
+          setTimeout(() => measure(attempt + 1), 1500)
+        } else {
+          setPingMs(null)
+          setMeasuring(false)
+        }
+      })
+  }
+
+  // Measure whenever this row becomes the active one (page open or selection).
+  onMount(() => {
+    if (isActive.peek()) measure()
+  })
+  const unsubscribe = isActive.subscribe(() => {
+    if (isActive.peek()) measure()
+  })
+  onCleanup(() => unsubscribe())
+
+  // Trailing indicator, shown for the active row only: spinner while measuring,
+  // then a check with the latency badge, or a warning if the server was
+  // unreachable.
+  const status = createComputed(() => {
+    if (!isActive()) return "none"
+    if (measuring()) return "measuring"
+    return pingMs() != null ? "ok" : "fail"
+  })
+  const pingText = createComputed(() =>
+    isActive() && !measuring() && pingMs() != null ? `${pingMs()} ms` : "",
+  )
+
+  function openRename() {
+    setMenuOpen(false)
+    setRenameText(name.peek())
+    setRenaming(true)
+  }
+
+  function commitRename(value: string) {
+    const next = value.trim()
+    setRenaming(false)
+    if (!next || next === name.peek()) return
+    setName(next)
+    saveVpnProfile({ ...p, name: next })
+  }
+
+  function remove() {
+    setMenuOpen(false)
+    deleteVpnProfile(p.id)
+    props.onDeleted()
+  }
+
+  return (
+    <box orientation={Gtk.Orientation.VERTICAL}>
+      <button
+        cssName="detail-row"
+        class={isActive.as((a) => (a ? "connected" : ""))}
+        onClicked={() => props.onSelect(p)}
+      >
+        {/* Right-click for rename / delete. */}
+        <Gtk.GestureClick button={3} onPressed={() => setMenuOpen(!menuOpen.peek())} />
+        <box spacing={10}>
+          <image iconName="network-vpn-symbolic" />
+          <label
+            label={name}
+            hexpand
+            halign={Gtk.Align.START}
+            ellipsize={Pango.EllipsizeMode.END}
+          />
+          <box valign={Gtk.Align.CENTER}>
+            <With value={pingText}>
+              {(t) => (t ? <label cssName="detail-badge" label={t} /> : <box />)}
+            </With>
+          </box>
+          <box cssName="detail-status" halign={Gtk.Align.CENTER} valign={Gtk.Align.CENTER}>
+            <With value={status}>
+              {(s) =>
+                s === "measuring" ? (
+                  <Gtk.Spinner spinning />
+                ) : s === "ok" ? (
+                  <image iconName="object-select-symbolic" />
+                ) : s === "fail" ? (
+                  <image cssName="detail-error" iconName="dialog-warning-symbolic" />
+                ) : (
+                  <box />
+                )
+              }
+            </With>
+          </box>
+        </box>
+      </button>
+
+      <revealer revealChild={menuOpen} transitionType={Gtk.RevealerTransitionType.SLIDE_DOWN}>
+        <box cssName="row-menu" orientation={Gtk.Orientation.VERTICAL}>
+          <button cssName="row-menu-item" onClicked={openRename}>
+            <box spacing={8}>
+              <image iconName="document-edit-symbolic" />
+              <label label="Rename" hexpand halign={Gtk.Align.START} />
+            </box>
+          </button>
+          <button cssName="row-menu-item" onClicked={remove}>
+            <box spacing={8}>
+              <image iconName="user-trash-symbolic" />
+              <label label="Delete" hexpand halign={Gtk.Align.START} />
+            </box>
+          </button>
+        </box>
+      </revealer>
+
+      <revealer revealChild={renaming} transitionType={Gtk.RevealerTransitionType.SLIDE_DOWN}>
+        <box cssName="wifi-password" spacing={6}>
+          <entry
+            hexpand
+            text={renameText}
+            onNotifyText={(self) => setRenameText(self.text)}
+            onActivate={() => commitRename(renameText.peek())}
+          />
+          <button cssName="wifi-connect" onClicked={() => commitRename(renameText.peek())}>
+            <label label="Save" />
+          </button>
+        </box>
+      </revealer>
+    </box>
+  )
+}
+
+function VpnPage(props: { onBack: () => void }) {
+  const running = vpnIsActivePoll()
+  const [profiles, setProfiles] = createState<VpnProfile[]>([])
+  const [activeId, setActiveId] = createState("")
+  const [addOpen, setAddOpen] = createState(false)
+  const [addText, setAddText] = createState("")
+  const [addError, setAddError] = createState(false)
+
+  function refresh() {
+    setProfiles(listVpnProfiles())
+    setActiveId(getActiveVpnId())
+  }
+
+  onMount(() => {
+    seedVpnProfiles()
+    refresh()
+  })
+
+  function select(p: VpnProfile) {
+    setActiveId(p.id) // optimistic; the poll/refresh confirms once restarted
+    applyVpnProfile(p).catch((e) => console.error("vpn apply:", String(e)))
+  }
+
+  function toggleService() {
+    const verb = running.peek() ? "stop" : "start"
+    execAsync(["sudo", SINGBOX_CTL, verb]).catch((e) =>
+      console.error("vpn", verb, ":", String(e)),
+    )
+  }
+
+  function addLink() {
+    const parsed = parseVlessLink(addText.peek())
+    if (!parsed) {
+      setAddError(true)
+      return
+    }
+    saveVpnProfile(parsed)
+    setAddText("")
+    setAddError(false)
+    setAddOpen(false)
+    refresh()
+  }
+
+  return (
+    <box cssName="detail-page" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
+      <box cssName="detail-header" spacing={10}>
+        <button cssName="detail-back" onClicked={props.onBack}>
+          <image iconName="go-previous-symbolic" />
+        </button>
+        <label cssName="detail-title" label="VPN" hexpand halign={Gtk.Align.START} />
+        <ToggleSwitch active={running} onToggle={toggleService} />
+      </box>
+
+      <scrolledwindow
+        cssName="detail-list"
+        hscrollbarPolicy={Gtk.PolicyType.NEVER}
+        propagateNaturalHeight
+        maxContentHeight={300}
+      >
+        <box orientation={Gtk.Orientation.VERTICAL} spacing={4}>
+          <For each={profiles} id={(p) => p.id}>
+            {(p) => (
+              <VpnRow profile={p} activeId={activeId} onSelect={select} onDeleted={refresh} />
+            )}
+          </For>
+        </box>
+      </scrolledwindow>
+
+      <revealer revealChild={addOpen} transitionType={Gtk.RevealerTransitionType.SLIDE_DOWN}>
+        <box cssName="wifi-password" spacing={6}>
+          {/* Submit with Enter — no separate button. */}
+          <entry
+            hexpand
+            text={addText}
+            class={addError.as((e) => (e ? "error" : ""))}
+            placeholderText={addError.as((e) => (e ? "Invalid vless:// link" : "vless://…"))}
+            onNotifyText={(self) => {
+              setAddText(self.text)
+              if (self.text !== "") setAddError(false)
+            }}
+            onActivate={addLink}
+          />
+        </box>
+      </revealer>
+
+      <button cssName="vpn-add" onClicked={() => setAddOpen(!addOpen.peek())}>
+        <box spacing={8} halign={Gtk.Align.CENTER}>
+          <image iconName="list-add-symbolic" />
+          <label label="Add config" />
+        </box>
+      </button>
+    </box>
+  )
+}
+
 // ── Pinned overlay window ─────────────────────────────────────────────────────
 
 // Right edge inset: same as the right panel's margin.
@@ -756,7 +1273,7 @@ export default function QuickSettingsWindow(props: {
   close: () => void
 }) {
   const { TOP, BOTTOM, LEFT, RIGHT } = Astal.WindowAnchor
-  const [page, setPage] = createState<"main" | "wifi" | "bluetooth">("main")
+  const [page, setPage] = createState<"main" | "wifi" | "bluetooth" | "vpn">("main")
 
   // Fully close the overlay and reset to the main page for next time.
   function closeAll() {
@@ -814,10 +1331,13 @@ export default function QuickSettingsWindow(props: {
                 <WifiPage onBack={() => setPage("main")} />
               ) : p === "bluetooth" ? (
                 <BluetoothPage onBack={() => setPage("main")} />
+              ) : p === "vpn" ? (
+                <VpnPage onBack={() => setPage("main")} />
               ) : (
                 <QuickSettingsContent
                   onWifiClick={() => setPage("wifi")}
                   onBluetoothClick={() => setPage("bluetooth")}
+                  onVpnClick={() => setPage("vpn")}
                 />
               )
             }
