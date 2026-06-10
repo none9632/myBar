@@ -7,6 +7,7 @@ import { VpnToggle, VpnPage } from "./quicksettings/vpn"
 import { MicToggle, VolumeSlider } from "./quicksettings/audio"
 import { PowerToggle, BrightnessSlider } from "./quicksettings/system"
 import { AirplaneToggle } from "./quicksettings/airplane"
+import { HardwareInfo } from "./quicksettings/hardware"
 
 // ── Compose ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ function QuickSettingsContent(props: {
   onWifiClick: () => void
   onBluetoothClick: () => void
   onVpnClick: () => void
+  onClose: () => void
 }) {
   return (
     <box cssName="quick-settings" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
@@ -36,6 +38,8 @@ function QuickSettingsContent(props: {
         <BrightnessSlider />
         <VolumeSlider />
       </box>
+
+      <HardwareInfo onClose={props.onClose} />
     </box>
   )
 }
@@ -118,6 +122,7 @@ export default function QuickSettingsWindow(props: {
                   onWifiClick={() => setPage("wifi")}
                   onBluetoothClick={() => setPage("bluetooth")}
                   onVpnClick={() => setPage("vpn")}
+                  onClose={closeAll}
                 />
               )
             }
