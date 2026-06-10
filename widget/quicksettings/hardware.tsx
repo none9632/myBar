@@ -1,5 +1,6 @@
 import { Gtk } from "ags/gtk4"
 import GLib from "gi://GLib?version=2.0"
+import Gio from "gi://Gio?version=2.0"
 import { execAsync } from "ags/process"
 import { readFile } from "ags/file"
 import { createPoll } from "ags/time"
@@ -9,6 +10,8 @@ interface HwStats {
   cpu: number // 0..1
   memUsed: number // bytes
   memTotal: number // bytes
+  diskUsed: number // bytes
+  diskTotal: number // bytes
   temp: number | null // °C
   rx: number // bytes/s
   tx: number // bytes/s
@@ -47,14 +50,15 @@ function fmtRate(bps: number): string {
 }
 
 // Icon glyphs. RAM and the temperature levels come from the user's MyFont
-// (contiguous block ram=U+408E, temp=U+408F–U+4093). CPU uses the Font Awesome
-// "microchip" (U+F2DB) from a Nerd Font — same as the user's waybar — written as
-// a \u escape since the raw glyph doesn't survive transfer. Its font is set via
-// the `nerd` class in style.scss; the rest render in MyFont.
-const GLYPH_CPU = ""
+// (contiguous block ram=U+408E, temp=U+408F–U+4093). CPU and Disk use Font
+// Awesome glyphs from a Nerd Font (microchip U+F2DB, hdd U+F0A0) — written as \u
+// escapes since the raw glyphs don't survive transfer. Their font is set via the
+// `nerd`/`disk` classes in style.scss; the rest render in MyFont.
+const GLYPH_CPU = "\uf2db"
 const GLYPH_RAM = "䂎"
 // Cold → hot. Reorder if the thermometer fill looks inverted.
 const GLYPH_TEMP = ["䂏", "䂐", "䂑", "䂒", "䂓"]
+const GLYPH_DISK = "\uf0a0"
 
 function tempGlyph(t: number | null): string {
   if (t == null || t < 45) return GLYPH_TEMP[0]
@@ -64,11 +68,11 @@ function tempGlyph(t: number | null): string {
   return GLYPH_TEMP[4]
 }
 
-// A metric row. The leading mark is either a MyFont glyph (cpu/ram/temp) or a
-// themed symbolic icon (network), since MyFont has no network glyph.
+// A metric row. The leading mark is either a glyph label (cpu/ram/disk/temp) or
+// a themed symbolic icon (network). `glyphClass` switches the glyph's font, e.g.
+// "nerd"/"disk" for the Nerd Font marks.
 function StatRow(props: {
   glyph?: string | Accessor<string>
-  // Extra CSS class on the glyph label, e.g. "nerd" to switch its font.
   glyphClass?: string
   iconName?: string
   label: string
@@ -93,9 +97,9 @@ function StatRow(props: {
   )
 }
 
-// Live hardware readout (CPU / RAM / temperature / network) plus a button that
-// opens btop in a kitty terminal. All sampled from /proc and /sys — no external
-// tools; CPU and network are delta-based across poll ticks.
+// Live hardware readout (CPU / RAM / disk / temperature / network) plus a button
+// that opens btop in a kitty terminal. All sampled from /proc and /sys (disk via
+// Gio) — no external tools; CPU and network are delta-based across poll ticks.
 export function HardwareInfo(props: { onClose: () => void }) {
   const tempPath = findCpuTempPath()
   // Previous samples for delta-based rates, held across poll ticks.
@@ -103,7 +107,7 @@ export function HardwareInfo(props: { onClose: () => void }) {
   let prevNet: { rx: number; tx: number; t: number } | null = null
 
   const stats = createPoll<HwStats>(
-    { cpu: 0, memUsed: 0, memTotal: 1, temp: null, rx: 0, tx: 0 },
+    { cpu: 0, memUsed: 0, memTotal: 1, diskUsed: 0, diskTotal: 1, temp: null, rx: 0, tx: 0 },
     2000,
     () => {
       // CPU: aggregate jiffies from the first /proc/stat line.
@@ -128,6 +132,22 @@ export function HardwareInfo(props: { onClose: () => void }) {
       const memTotal = field(mem, /MemTotal:\s+(\d+)/) * 1024
       const memAvail = field(mem, /MemAvailable:\s+(\d+)/) * 1024
       const memUsed = Math.max(0, memTotal - memAvail)
+
+      // Disk: usage of the root filesystem, via Gio (no subprocess).
+      let diskUsed = 0
+      let diskTotal = 1
+      try {
+        const fsinfo = Gio.File.new_for_path("/").query_filesystem_info(
+          "filesystem::size,filesystem::used,filesystem::free",
+          null,
+        )
+        diskTotal = Number(fsinfo.get_attribute_uint64("filesystem::size")) || 1
+        const used = Number(fsinfo.get_attribute_uint64("filesystem::used"))
+        const free = Number(fsinfo.get_attribute_uint64("filesystem::free"))
+        diskUsed = used || Math.max(0, diskTotal - free)
+      } catch (e) {
+        console.error("disk:", String(e))
+      }
 
       // Temperature.
       let temp: number | null = null
@@ -160,7 +180,7 @@ export function HardwareInfo(props: { onClose: () => void }) {
       }
       prevNet = { rx: rxBytes, tx: txBytes, t: now }
 
-      return { cpu, memUsed, memTotal, temp, rx, tx }
+      return { cpu, memUsed, memTotal, diskUsed, diskTotal, temp, rx, tx }
     },
   )
 
@@ -185,6 +205,13 @@ export function HardwareInfo(props: { onClose: () => void }) {
         label="RAM"
         level={stats.as((s) => (s.memTotal > 0 ? s.memUsed / s.memTotal : 0))}
         value={stats.as((s) => `${fmtGiB(s.memUsed)} / ${fmtGiB(s.memTotal)} GiB`)}
+      />
+      <StatRow
+        glyph={GLYPH_DISK}
+        glyphClass="disk"
+        label="Disk"
+        level={stats.as((s) => (s.diskTotal > 0 ? s.diskUsed / s.diskTotal : 0))}
+        value={stats.as((s) => `${fmtGiB(s.diskUsed)} / ${fmtGiB(s.diskTotal)} GiB`)}
       />
       <StatRow
         glyph={stats.as((s) => tempGlyph(s.temp))}
