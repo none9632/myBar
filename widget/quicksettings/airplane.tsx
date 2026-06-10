@@ -1,12 +1,12 @@
 import { execAsync } from "ags/process"
 import { createPoll } from "ags/time"
+import { Accessor } from "gnim"
 import { Toggle } from "./common"
 
-// Airplane mode toggles every radio via rfkill. /dev/rfkill is writable by the
-// active-session user (systemd uaccess ACL), so block/unblock needs no privilege.
-// State = airplane on when every rfkill device is soft-blocked.
-export function AirplaneToggle() {
-  const enabled = createPoll(
+// Airplane on = every rfkill device is soft-blocked. Shared by the tile and the
+// bar status indicator.
+export function airplaneEnabledPoll(): Accessor<boolean> {
+  return createPoll(
     false,
     2000,
     ["bash", "-c", "rfkill --noheadings --output SOFT 2>/dev/null"],
@@ -15,6 +15,12 @@ export function AirplaneToggle() {
       return lines.length > 0 && lines.every((l) => l.trim() === "blocked")
     },
   )
+}
+
+// Airplane mode toggles every radio via rfkill. /dev/rfkill is writable by the
+// active-session user (systemd uaccess ACL), so block/unblock needs no privilege.
+export function AirplaneToggle() {
+  const enabled = airplaneEnabledPoll()
 
   function toggle() {
     const cmd = enabled.peek() ? "unblock" : "block"

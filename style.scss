@@ -76,6 +76,16 @@ updates-icon {
   color: $subtext;
 }
 
+// At-a-glance status icons in the bar (Wi-Fi/BT/VPN/airplane/mic).
+status-indicators {
+  padding: 0 2px;
+
+  image {
+    -gtk-icon-size: 16px;
+    color: $fg;
+  }
+}
+
 clock {
   time {
     font-weight: bold;
