@@ -7,6 +7,7 @@ import Battery from "gi://AstalBattery?version=0.1"
 import Hyprland from "gi://AstalHyprland?version=0.1"
 import QuickSettingsWindow from "./QuickSettings"
 import StatusIndicators from "./StatusIndicators"
+import SystemTray from "./SystemTray"
 
 // Command to count available updates (official repos + AUR).
 const UPDATE_CHECK_CMD = ["bash", "-c", "(checkupdates; yay -Qua) 2>/dev/null | wc -l"]
@@ -112,6 +113,7 @@ export default function RightPanel(gdkmonitor: Gdk.Monitor) {
         <Updates />
         <BatteryWidget />
         <StatusIndicators />
+        <SystemTray />
         <Clock />
         <button cssName="qs-button" onClicked={() => setQsOpen(!qsOpen.peek())}>
           <image iconName="view-grid-symbolic" />

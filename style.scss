@@ -11,12 +11,23 @@ $themes: (
     "accent":    #89b4fa,
     "accent-fg": #1e1e2e,
     "radius":    8px,
+  ),
+  // Adapted from the user's waybar (doom-one palette): slate background
+  // (#2b303b), light grey text (#cad0da), blue accent (#51afef).
+  "doom-one": (
+    "bg":        rgba(43, 48, 59, 0.9),   // #2b303b
+    "fg":        #cad0da,
+    "subtext":   #8b919e,
+    "active-bg": rgba(81, 175, 239, 0.18), // #51afef @ 18%
+    "accent":    #51afef,
+    "accent-fg": #1c252a,
+    "radius":    8px,
   )
 );
 
 // ── Active theme (change this to switch) ─────────────────────────────────────
 
-$active-theme: "catppuccin-mocha";
+$active-theme: "doom-one";
 
 // ── Extract variables ─────────────────────────────────────────────────────────
 
@@ -28,6 +39,16 @@ $active-bg: map.get($t, "active-bg");
 $accent:    map.get($t, "accent");
 $accent-fg: map.get($t, "accent-fg");
 $radius:    map.get($t, "radius");
+
+// ── Accent palette (doom-one) for per-module tints and coloured icons ─────────
+
+$red:    #ff6c6b;
+$green:  #98be65;
+$orange: #ffaf00;
+$blue:   #51afef;
+$cyan:   #46d9ff;
+$purple: #d499e5;
+$brown:  #c38a48;
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -60,33 +81,51 @@ workspaces {
     color: $fg;
 
     &.active {
-      background: $active-bg;
+      background: $accent;
+      color: $accent-fg;
     }
   }
 }
 
+// ── Right-bar modules ─────────────────────────────────────────────────────────
+// Each module is a rounded chip with its own colour tint + coloured icon, adapted
+// from the user's waybar (doom-one): language=purple, updates=brown,
+// battery=cyan, clock=blue.
+
 kb-layout,
 updates,
-battery {
-  padding: 0 2px;
-}
-
-kb-icon,
-updates-icon {
-  color: $subtext;
-}
-
-// At-a-glance status icons in the bar (Wi-Fi/BT/VPN/airplane/mic).
+battery,
+clock,
 status-indicators {
-  padding: 0 2px;
+  padding: 2px 10px;
+  border-radius: calc(#{$radius} - 2px);
+  min-height: $content-height;
+}
 
+kb-layout {
+  background: rgba(212, 153, 229, 0.16); // $purple
+  kb-icon {
+    color: $purple;
+  }
+}
+
+updates {
+  background: rgba(195, 138, 72, 0.16); // $brown
+  updates-icon {
+    color: $brown;
+  }
+}
+
+battery {
+  background: rgba(70, 217, 255, 0.14); // $cyan
   image {
-    -gtk-icon-size: 16px;
-    color: $fg;
+    color: $cyan;
   }
 }
 
 clock {
+  background: rgba(81, 175, 239, 0.14); // $blue
+
   time {
     font-weight: bold;
     color: $fg;
@@ -94,6 +133,54 @@ clock {
 
   date {
     color: $subtext;
+  }
+}
+
+// At-a-glance status icons (Wi-Fi/BT/VPN/airplane/mic): neutral chip; the icons
+// keep the foreground colour since they convey live state, not a category.
+status-indicators {
+  background: $active-bg;
+  padding: 2px 8px;
+
+  image {
+    -gtk-icon-size: 16px;
+    color: $fg;
+  }
+}
+
+// ── System tray ───────────────────────────────────────────────────────────────
+// A single neutral chip (like the status indicators) holding all SNI items with
+// no gaps between them; each item is a flat button that only tints on hover.
+
+system-tray {
+  background: $active-bg;
+  padding: 2px 6px;
+  border-radius: calc(#{$radius} - 2px);
+  min-height: $content-height;
+
+  tray-item {
+    // GtkMenuButton wraps an inner `button` that the theme gives its own
+    // background, border and shadow — flatten it so only the panel chip shows.
+    > button {
+      background: none;
+      border: none;
+      box-shadow: none;
+      outline: none;
+      min-height: 0;
+      min-width: 0;
+      margin: 0;
+      padding: 0 4px;
+      border-radius: calc(#{$radius} - 4px);
+      color: $fg;
+
+      &:hover {
+        background: rgba($accent, 0.25);
+      }
+    }
+
+    image {
+      -gtk-icon-size: 16px;
+    }
   }
 }
 
@@ -230,19 +317,29 @@ qs-hardware {
     // every mark's label is exactly this width and their centres line up — a
     // narrower min-width lets a wide glyph (the Nerd microchip) grow its label
     // and drift its centre rightward relative to the others.
+    // Network mark (symbolic icon).
     hw-icon {
       -gtk-icon-size: 16px;
-      color: $subtext;
+      color: $blue;
       min-width: 28px;
     }
 
     // RAM / Temp marks: glyphs from the user's MyFont, aligned to the same
-    // column width as the symbolic network icon above.
+    // column width as the symbolic network icon above. Each metric gets its own
+    // colour (from the user's waybar).
     hw-glyph {
       font-family: "MyFont";
       font-size: 20px;
       color: $subtext;
       min-width: 28px;
+
+      &.ram {
+        color: $green;
+      }
+
+      &.temp {
+        color: $orange;
+      }
 
       // CPU uses a Font Awesome glyph from a Nerd Font instead. That glyph has
       // extra left-side bearing, so it sits further right than the MyFont marks
@@ -251,6 +348,7 @@ qs-hardware {
       // pixel value to taste.
       &.nerd {
         font-family: "Iosevka Nerd Font";
+        color: $red;
         margin-left: -4px;
         margin-right: 4px;
       }
@@ -258,6 +356,7 @@ qs-hardware {
       // Disk uses a Nerd Font glyph too; nudge it like CPU (tune to taste).
       &.disk {
         font-family: "Iosevka Nerd Font";
+        color: $brown;
         margin-left: -5px;
         margin-right: 5px;
       }

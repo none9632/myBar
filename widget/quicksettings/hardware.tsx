@@ -202,6 +202,7 @@ export function HardwareInfo(props: { onClose: () => void }) {
       />
       <StatRow
         glyph={GLYPH_RAM}
+        glyphClass="ram"
         label="RAM"
         level={stats.as((s) => (s.memTotal > 0 ? s.memUsed / s.memTotal : 0))}
         value={stats.as((s) => `${fmtGiB(s.memUsed)} / ${fmtGiB(s.memTotal)} GiB`)}
@@ -215,6 +216,7 @@ export function HardwareInfo(props: { onClose: () => void }) {
       />
       <StatRow
         glyph={stats.as((s) => tempGlyph(s.temp))}
+        glyphClass="temp"
         label="Temp"
         level={stats.as((s) => (s.temp != null ? Math.min(1, s.temp / 100) : 0))}
         value={stats.as((s) => (s.temp != null ? `${Math.round(s.temp)}°C` : "—"))}
