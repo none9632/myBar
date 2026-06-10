@@ -176,6 +176,41 @@ function NetworkRow(props: {
   )
 }
 
+// A titled group of networks ("Saved" / "Other"). The section is a single static
+// box whose position in the list is therefore fixed; emptiness is handled with
+// `visible` rather than a <With>. (A <With> re-renders by appending its new widget
+// to the parent's end, so when "Saved" populated after "Other" it ended up below
+// it — see [[gnim-with-append-order]]. An invisible box takes no space.)
+function NetworkSection(props: {
+  title: string
+  networks: Accessor<Network.AccessPoint[]>
+  activeSsid: Accessor<string | null>
+  saved: Accessor<Set<string>>
+  expandedRow: Accessor<string | null>
+  setExpandedRow: (key: string | null) => void
+}) {
+  return (
+    <box
+      orientation={Gtk.Orientation.VERTICAL}
+      spacing={4}
+      visible={props.networks.as((n) => n.length > 0)}
+    >
+      <label cssName="detail-section" label={props.title} halign={Gtk.Align.START} />
+      <For each={props.networks} id={(ap) => ap.bssid}>
+        {(ap) => (
+          <NetworkRow
+            ap={ap}
+            activeSsid={props.activeSsid}
+            saved={props.saved}
+            expandedRow={props.expandedRow}
+            setExpandedRow={props.setExpandedRow}
+          />
+        )}
+      </For>
+    </box>
+  )
+}
+
 export function WifiPage(props: { onBack: () => void }) {
   const net = Network.get_default()
   const enabled = createBinding(net, "wifi", "enabled")
@@ -184,22 +219,10 @@ export function WifiPage(props: { onBack: () => void }) {
   const activeSsid = activeApBinding.as((ap) => ap?.ssid ?? null)
   // Key (bssid) of the row whose password field is open — at most one.
   const [expandedRow, setExpandedRow] = createState<string | null>(null)
-  // Connected network first, then the rest sorted by signal strength.
-  const accessPoints = createComputed(() => {
-    const aps = apsBinding()
-    const activeBssid = activeApBinding()?.bssid
-    return aps
-      ? [...aps]
-          .filter((ap) => ap.ssid)
-          .sort((a, b) => {
-            if (a.bssid === activeBssid) return -1
-            if (b.bssid === activeBssid) return 1
-            return b.strength - a.strength
-          })
-      : []
-  })
+
   // Names of known Wi-Fi connections that have connected successfully at least
-  // once (TIMESTAMP > 0). This excludes profiles left over from a wrong password.
+  // once (TIMESTAMP > 0). This excludes profiles left over from a wrong password,
+  // and is what splits "saved" networks from the rest.
   const savedNetworks = createPoll(
     new Set<string>(),
     5000,
@@ -210,6 +233,41 @@ export function WifiPage(props: { onBack: () => void }) {
     ],
     (out) => new Set(out.split("\n").map((s) => s.trim()).filter(Boolean)),
   )
+
+  // Networks split into two groups — saved (we have the password) and the rest —
+  // each connected-first then by signal strength.
+  //
+  // While a password field is open (expandedRow set), freeze the groups: returning
+  // the previous object (same array references) keeps <For> from re-rendering.
+  // Otherwise a periodic re-sort on fluctuating signal — or a savedNetworks refresh
+  // moving a network between sections — would reorder/reparent the row being edited
+  // and make GTK drop keyboard focus from its entry. Updates resume on field close.
+  let lastGroups: { saved: Network.AccessPoint[]; other: Network.AccessPoint[] } = {
+    saved: [],
+    other: [],
+  }
+  const groups = createComputed(() => {
+    if (expandedRow() !== null) return lastGroups
+    const aps = apsBinding()
+    const activeBssid = activeApBinding()?.bssid
+    const known = savedNetworks()
+    const sorted = aps
+      ? [...aps]
+          .filter((ap) => ap.ssid)
+          .sort((a, b) => {
+            if (a.bssid === activeBssid) return -1
+            if (b.bssid === activeBssid) return 1
+            return b.strength - a.strength
+          })
+      : []
+    lastGroups = {
+      saved: sorted.filter((ap) => known.has(ap.ssid!)),
+      other: sorted.filter((ap) => !known.has(ap.ssid!)),
+    }
+    return lastGroups
+  })
+  const savedAps = groups.as((g) => g.saved)
+  const otherAps = groups.as((g) => g.other)
 
   // LAN IPv4 of the Wi-Fi device itself (avoids picking up a VPN tunnel address).
   const ip = createPoll("—", 5000, [
@@ -243,18 +301,23 @@ export function WifiPage(props: { onBack: () => void }) {
         propagateNaturalHeight
         maxContentHeight={300}
       >
-        <box orientation={Gtk.Orientation.VERTICAL} spacing={4}>
-          <For each={accessPoints} id={(ap) => ap.bssid}>
-            {(ap) => (
-              <NetworkRow
-                ap={ap}
-                activeSsid={activeSsid}
-                saved={savedNetworks}
-                expandedRow={expandedRow}
-                setExpandedRow={setExpandedRow}
-              />
-            )}
-          </For>
+        <box orientation={Gtk.Orientation.VERTICAL} spacing={8}>
+          <NetworkSection
+            title="Saved"
+            networks={savedAps}
+            activeSsid={activeSsid}
+            saved={savedNetworks}
+            expandedRow={expandedRow}
+            setExpandedRow={setExpandedRow}
+          />
+          <NetworkSection
+            title="Other"
+            networks={otherAps}
+            activeSsid={activeSsid}
+            saved={savedNetworks}
+            expandedRow={expandedRow}
+            setExpandedRow={setExpandedRow}
+          />
         </box>
       </scrolledwindow>
 
