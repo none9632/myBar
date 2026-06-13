@@ -29,6 +29,11 @@ function TrayButton(item: Tray.TrayItem) {
   return (
     <menubutton
       cssName="tray-item"
+      // Hide items that have no icon. AstalTray can leave an orphaned, icon-less
+      // "ghost" item after a startup race (the g_list_store_remove warning); with
+      // no icon it would otherwise render as an empty slot. Bound per-item so a
+      // real item that loads its icon a moment later still appears.
+      visible={createBinding(item, "gicon").as((g) => g != null)}
       $={setup}
       // No menu → left-click sends an activate request to the app instead.
       onActivate={() => {
@@ -45,9 +50,17 @@ export default function SystemTray() {
   const tray = Tray.get_default()
   const items = createBinding(tray, "items")
 
+  // Show the chip only when at least one item actually has an icon, so a lone
+  // icon-less ghost item doesn't leave an empty pill in the bar.
+  const anyShowable = items.as((arr) => arr.some((it) => it.gicon != null))
+
   return (
-    <box cssName="system-tray" visible={items.as((i) => i.length > 0)}>
-      <For each={items} id={(item) => item.id}>
+    <box cssName="system-tray" visible={anyShowable}>
+      {/* Key by item_id (AstalTray's unique handle), NOT id — id is the
+          app-supplied name and is often empty/duplicated. Duplicate keys make
+          <For> drop or leave stale buttons. Icon-less ghosts are hidden per
+          button (see TrayButton's visible). */}
+      <For each={items} id={(item) => item.item_id}>
         {(item) => TrayButton(item)}
       </For>
     </box>
