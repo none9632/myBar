@@ -46,10 +46,15 @@ function QuickSettingsContent(props: {
 
 // ── Pinned overlay window ─────────────────────────────────────────────────────
 
-// Right edge inset: same as the right panel's margin.
-const QS_MARGIN_RIGHT = 8
-// Top inset: panel top margin (8) + panel height (~32) + 4px gap below the panel.
-const QS_MARGIN_TOP = 44
+// Where the Quick Settings panel sits relative to the bar. Keep BAR_INSET and
+// BAR_HEIGHT in sync with the right panel in style.scss (the `margin` on
+// *-panel-inner and $bar-height) — QS_GAP is the one knob you normally touch.
+const BAR_INSET = 10 // = margin on *-panel-inner
+const BAR_HEIGHT = 32 // = $bar-height
+const QS_GAP = 10 // gap between the bottom of the bar and the panel
+
+const QS_MARGIN_RIGHT = BAR_INSET // right edge aligned with the bar
+const QS_MARGIN_TOP = BAR_INSET + BAR_HEIGHT + QS_GAP // below the bar + the gap
 
 export default function QuickSettingsWindow(props: {
   gdkmonitor: Gdk.Monitor
