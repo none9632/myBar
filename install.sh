@@ -5,6 +5,8 @@
 #      installs and (re)starts a sing-box config. The only thing granted sudo.
 #   2. /etc/sudoers.d/sing-box   — lets the current user run that one helper
 #      without a password.
+#   3. ~/.config/ags             — symlink to this checkout so AGS loads the
+#      project in place (`ags run` reads ~/.config/ags by default).
 #
 # Reading VPN state stays unprivileged; every mutation goes through the helper.
 # Safe to re-run: it overwrites both files and validates before installing.
@@ -39,6 +41,11 @@ if [ -z "$TARGET_HOME" ]; then
 fi
 BIN_DIR="$TARGET_HOME/.local/bin"
 HELPER_PATH="$BIN_DIR/singbox-ctl"
+
+# Absolute path of this checkout (the dir install.sh lives in), for the
+# ~/.config/ags symlink below. realpath so it resolves no matter how we were
+# invoked; cwd is preserved across the sudo re-exec, so it stays correct.
+PROJECT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 
 echo "Installing for user: $TARGET_USER (helper -> $HELPER_PATH)"
 
@@ -106,5 +113,28 @@ visudo -cf "$tmp/sing-box-sudoers"
 install -m 0440 -o root -g root "$tmp/sing-box-sudoers" "$SUDOERS_PATH"
 echo "✓ installed $SUDOERS_PATH"
 
-# ── 3. clear any stuck start-rate-limit from earlier testing ───────────────────
+# ── 3. ~/.config/ags symlink ──────────────────────────────────────────────────
+# Point AGS at this checkout so `ags run` (which reads ~/.config/ags) loads the
+# project in place — no copying, edits stay live. Never clobber a real directory.
+CONFIG_DIR="$TARGET_HOME/.config"
+AGS_LINK="$CONFIG_DIR/ags"
+[ -d "$CONFIG_DIR" ] || install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0755 "$CONFIG_DIR"
+if [ -L "$AGS_LINK" ]; then
+  current="$(readlink "$AGS_LINK")"
+  if [ "$current" = "$PROJECT_DIR" ]; then
+    echo "✓ symlink already present: $AGS_LINK -> $PROJECT_DIR"
+  else
+    ln -sfn "$PROJECT_DIR" "$AGS_LINK"          # -n: replace the link, don't follow into it
+    chown -h "$TARGET_USER:$TARGET_GROUP" "$AGS_LINK"
+    echo "✓ updated symlink: $AGS_LINK -> $PROJECT_DIR (was -> $current)"
+  fi
+elif [ -e "$AGS_LINK" ]; then
+  echo "warning: $AGS_LINK exists and is not a symlink; leaving it untouched." >&2
+else
+  ln -s "$PROJECT_DIR" "$AGS_LINK"
+  chown -h "$TARGET_USER:$TARGET_GROUP" "$AGS_LINK"
+  echo "✓ created symlink: $AGS_LINK -> $PROJECT_DIR"
+fi
+
+# ── 4. clear any stuck start-rate-limit from earlier testing ───────────────────
 systemctl reset-failed "$UNIT" 2>/dev/null || true
