@@ -86,7 +86,7 @@ function StatRow(props: {
       ) : (
         <image cssName="hw-icon" iconName={props.iconName} />
       )}
-      <label cssName="hw-label" label={props.label} />
+      <label cssName="hw-label" label={props.label} xalign={0} />
       {props.level ? (
         <Gtk.LevelBar hexpand valign={Gtk.Align.CENTER} value={props.level} />
       ) : (

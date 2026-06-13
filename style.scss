@@ -95,7 +95,7 @@ workspaces {
     min-height: $content-height;
     margin: 0;
     padding: 0;
-    color: $subtext;
+    color: $fg;
     // The active workspace gets the sliding accent fill behind it (ws-pill,
     // animated from LeftPanel.tsx). Here we only ease the number colour; the
     // active number is dark so it reads on the accent fill.
@@ -225,6 +225,55 @@ system-tray {
     image {
       -gtk-icon-size: 16px;
     }
+  }
+}
+
+// ── Tray item menus (D-Bus popovers) ──────────────────────────────────────────
+// The menu that opens when you click a system-tray icon is a GtkPopoverMenu
+// built from the app's D-Bus menu. Restyle it to match the panel: a dark rounded
+// card with accent-tinted hover, like the inline row menus. blur_popups in
+// hyprland.lua frosts the translucent $bg, so it reads as the same glass.
+
+popover.menu {
+  font-family: $font;
+  background: transparent; // the card is drawn on `contents`
+
+  > contents {
+    background: $bg;
+    border-radius: $radius;
+    padding: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    color: $fg;
+  }
+
+  // Pointer triangle — paint it like the card so it blends in.
+  > arrow {
+    background: $bg;
+  }
+
+  modelbutton {
+    padding: 6px 12px;
+    border-radius: calc(#{$radius} - 4px);
+    color: $fg;
+
+    &:hover {
+      background: $active-bg;
+    }
+
+    &:disabled {
+      color: $subtext;
+    }
+
+    image {
+      -gtk-icon-size: 16px;
+      margin-right: 8px;
+    }
+  }
+
+  separator {
+    background: rgba($fg, 0.12);
+    margin: 4px 2px;
+    min-height: 1px;
   }
 }
 
