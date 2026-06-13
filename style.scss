@@ -307,6 +307,18 @@ quick-settings-wrapper {
   border-radius: 6px;
   padding: 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  // Fade in/out together with the Revealer slide. The .shown class tracks the
+  // Revealer's reveal state from QuickSettings.tsx; keep this duration in sync
+  // with QS_ANIM_MS there. Hyprland's own layer fade doesn't show here (the
+  // surface unmaps only after the slide, when it's already empty), so the fade
+  // is done explicitly in GTK.
+  opacity: 0;
+  transition: opacity 250ms ease;
+
+  &.shown {
+    opacity: 1;
+  }
 }
 
 quick-settings {

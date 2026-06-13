@@ -1,6 +1,7 @@
 import app from "ags/gtk4/app"
 import { Astal, Gtk, Gdk } from "ags/gtk4"
-import { Accessor, createState, With } from "gnim"
+import GLib from "gi://GLib"
+import { createState, With } from "gnim"
 import { WifiToggle, WifiPage } from "./quicksettings/wifi"
 import { BluetoothToggle, BluetoothPage } from "./quicksettings/bluetooth"
 import { VpnToggle, VpnPage } from "./quicksettings/vpn"
@@ -56,31 +57,66 @@ const QS_GAP = 10 // gap between the bottom of the bar and the panel
 const QS_MARGIN_RIGHT = BAR_INSET // right edge aligned with the bar
 const QS_MARGIN_TOP = BAR_INSET + BAR_HEIGHT + QS_GAP // below the bar + the gap
 
-// Shared open state. The qs-button, the Escape key, and an external trigger
-// (Hyprland keybind → `ags request quicksettings`) all drive this one signal,
-// so however the panel is opened, every entry point stays in sync.
-const [qsVisible, setQsVisible] = createState(false)
-export { qsVisible }
-export const toggleQs = () => setQsVisible(!qsVisible.peek())
-export const closeQs = () => setQsVisible(false)
+// Open/close slide duration (kept in sync with the Revealer below).
+const QS_ANIM_MS = 250
 
-export default function QuickSettingsWindow(props: {
-  gdkmonitor: Gdk.Monitor
-  visible: Accessor<boolean>
-  close: () => void
-}) {
+// Shared open state, animated. The window must stay mapped while the panel slides
+// out, so intent is split in two: `mapped` shows the window, `revealed` drives the
+// Revealer. Opening maps then reveals (next tick, so the Revealer actually
+// animates instead of snapping); closing un-reveals, then unmaps once the slide
+// has finished. The qs-button, Escape, and `ags request quicksettings` all go
+// through these, so every entry point stays in sync.
+const [mapped, setMapped] = createState(false)
+const [revealed, setRevealed] = createState(false)
+
+let isOpen = false
+let closeTimer = 0
+
+export function openQs() {
+  isOpen = true
+  if (closeTimer) {
+    GLib.source_remove(closeTimer)
+    closeTimer = 0
+  }
+  setMapped(true)
+  // Let the window/Revealer map first; revealing in the same frame snaps.
+  GLib.timeout_add(GLib.PRIORITY_DEFAULT, 20, () => {
+    if (isOpen) setRevealed(true)
+    return GLib.SOURCE_REMOVE
+  })
+}
+
+export function closeQs() {
+  isOpen = false
+  setRevealed(false)
+  if (closeTimer) GLib.source_remove(closeTimer)
+  // Unmap only after the slide-out has played.
+  closeTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, QS_ANIM_MS, () => {
+    if (!isOpen) setMapped(false)
+    closeTimer = 0
+    return GLib.SOURCE_REMOVE
+  })
+}
+
+export const toggleQs = () => (isOpen ? closeQs() : openQs())
+
+export default function QuickSettingsWindow(props: { gdkmonitor: Gdk.Monitor }) {
   const { TOP, BOTTOM, LEFT, RIGHT } = Astal.WindowAnchor
   const [page, setPage] = createState<"main" | "wifi" | "bluetooth" | "vpn">("main")
 
-  // Fully close the overlay and reset to the main page for next time.
+  // Closing slides the panel out (closeQs). Reset to the main page only once the
+  // window is fully unmapped, so the slide-out shows the current page instead of
+  // flipping to main mid-animation.
   function closeAll() {
-    setPage("main")
-    props.close()
+    closeQs()
   }
+  mapped.subscribe(() => {
+    if (!mapped.peek()) setPage("main")
+  })
 
   return (
     <window
-      visible={props.visible}
+      visible={mapped}
       name="quick-settings"
       namespace="quick-settings"
       class="QuickSettings"
@@ -113,34 +149,42 @@ export default function QuickSettingsWindow(props: {
         <box>
           <Gtk.GestureClick onPressed={() => closeAll()} />
         </box>
-        {/* Overlay child: the pinned settings panel. */}
-        <box
+        {/* Overlay child: the pinned settings panel, in a Revealer so it slides
+            down from under the bar on open and back up on close. */}
+        <revealer
           $type="overlay"
-          cssName="quick-settings-wrapper"
           halign={Gtk.Align.END}
           valign={Gtk.Align.START}
           marginTop={QS_MARGIN_TOP}
           marginEnd={QS_MARGIN_RIGHT}
+          revealChild={revealed}
+          transitionType={Gtk.RevealerTransitionType.SLIDE_DOWN}
+          transitionDuration={QS_ANIM_MS}
         >
-          <With value={page}>
-            {(p) =>
-              p === "wifi" ? (
-                <WifiPage onBack={() => setPage("main")} />
-              ) : p === "bluetooth" ? (
-                <BluetoothPage onBack={() => setPage("main")} />
-              ) : p === "vpn" ? (
-                <VpnPage onBack={() => setPage("main")} />
-              ) : (
-                <QuickSettingsContent
-                  onWifiClick={() => setPage("wifi")}
-                  onBluetoothClick={() => setPage("bluetooth")}
-                  onVpnClick={() => setPage("vpn")}
-                  onClose={closeAll}
-                />
-              )
-            }
-          </With>
-        </box>
+          <box
+            cssName="quick-settings-wrapper"
+            class={revealed.as((r) => (r ? "shown" : ""))}
+          >
+            <With value={page}>
+              {(p) =>
+                p === "wifi" ? (
+                  <WifiPage onBack={() => setPage("main")} />
+                ) : p === "bluetooth" ? (
+                  <BluetoothPage onBack={() => setPage("main")} />
+                ) : p === "vpn" ? (
+                  <VpnPage onBack={() => setPage("main")} />
+                ) : (
+                  <QuickSettingsContent
+                    onWifiClick={() => setPage("wifi")}
+                    onBluetoothClick={() => setPage("bluetooth")}
+                    onVpnClick={() => setPage("vpn")}
+                    onClose={closeAll}
+                  />
+                )
+              }
+            </With>
+          </box>
+        </revealer>
       </overlay>
     </window>
   )
