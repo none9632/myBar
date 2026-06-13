@@ -56,6 +56,14 @@ const QS_GAP = 10 // gap between the bottom of the bar and the panel
 const QS_MARGIN_RIGHT = BAR_INSET // right edge aligned with the bar
 const QS_MARGIN_TOP = BAR_INSET + BAR_HEIGHT + QS_GAP // below the bar + the gap
 
+// Shared open state. The qs-button, the Escape key, and an external trigger
+// (Hyprland keybind → `ags request quicksettings`) all drive this one signal,
+// so however the panel is opened, every entry point stays in sync.
+const [qsVisible, setQsVisible] = createState(false)
+export { qsVisible }
+export const toggleQs = () => setQsVisible(!qsVisible.peek())
+export const closeQs = () => setQsVisible(false)
+
 export default function QuickSettingsWindow(props: {
   gdkmonitor: Gdk.Monitor
   visible: Accessor<boolean>

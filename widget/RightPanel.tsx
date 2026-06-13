@@ -5,7 +5,7 @@ import { createPoll, interval } from "ags/time"
 import { createBinding, createState, onCleanup } from "gnim"
 import Battery from "gi://AstalBattery?version=0.1"
 import Hyprland from "gi://AstalHyprland?version=0.1"
-import QuickSettingsWindow from "./QuickSettings"
+import QuickSettingsWindow, { qsVisible, toggleQs, closeQs } from "./QuickSettings"
 import StatusIndicators from "./StatusIndicators"
 import SystemTray from "./SystemTray"
 
@@ -136,13 +136,14 @@ function Clock() {
 
 export default function RightPanel(gdkmonitor: Gdk.Monitor) {
   const { TOP, RIGHT } = Astal.WindowAnchor
-  const [qsOpen, setQsOpen] = createState(false)
 
   // Pinned overlay window for Quick Settings (self-registers via application={app}).
+  // Open state is shared (see QuickSettings.tsx) so the qs-button, Escape, and the
+  // `ags request quicksettings` keybind all toggle the same panel.
   QuickSettingsWindow({
     gdkmonitor,
-    visible: qsOpen,
-    close: () => setQsOpen(false),
+    visible: qsVisible,
+    close: closeQs,
   })
 
   return (
@@ -166,7 +167,7 @@ export default function RightPanel(gdkmonitor: Gdk.Monitor) {
         <Updates />
         <KbLayout />
         <Clock />
-        <button cssName="qs-button" onClicked={() => setQsOpen(!qsOpen.peek())}>
+        <button cssName="qs-button" onClicked={() => toggleQs()}>
           <image iconName="view-grid-symbolic" />
         </button>
       </box>
