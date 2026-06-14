@@ -211,7 +211,7 @@ function NetworkSection(props: {
   )
 }
 
-export function WifiPage(props: { onBack: () => void }) {
+export function WifiPage(props: { onBack?: () => void }) {
   const net = Network.get_default()
   const enabled = createBinding(net, "wifi", "enabled")
   const apsBinding = createBinding(net, "wifi", "accessPoints")
@@ -282,9 +282,11 @@ export function WifiPage(props: { onBack: () => void }) {
   return (
     <box cssName="detail-page" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
       <box cssName="detail-header" spacing={10}>
-        <button cssName="detail-back" onClicked={props.onBack}>
-          <image iconName="go-previous-symbolic" />
-        </button>
+        {props.onBack ? (
+          <button cssName="detail-back" onClicked={props.onBack}>
+            <image iconName="go-previous-symbolic" />
+          </button>
+        ) : null}
         <label cssName="detail-title" label="Wi-Fi" hexpand halign={Gtk.Align.START} />
         <ToggleSwitch
           active={enabled.as((e) => !!e)}

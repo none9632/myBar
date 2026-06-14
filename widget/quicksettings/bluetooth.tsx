@@ -187,7 +187,7 @@ function DeviceSection(props: { title: string; devices: Accessor<Bluetooth.Devic
   )
 }
 
-export function BluetoothPage(props: { onBack: () => void }) {
+export function BluetoothPage(props: { onBack?: () => void }) {
   const bt = Bluetooth.get_default()
   const powered = createBinding(bt, "isPowered")
   const devicesBinding = createBinding(bt, "devices")
@@ -237,9 +237,11 @@ export function BluetoothPage(props: { onBack: () => void }) {
   return (
     <box cssName="detail-page" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
       <box cssName="detail-header" spacing={10}>
-        <button cssName="detail-back" onClicked={props.onBack}>
-          <image iconName="go-previous-symbolic" />
-        </button>
+        {props.onBack ? (
+          <button cssName="detail-back" onClicked={props.onBack}>
+            <image iconName="go-previous-symbolic" />
+          </button>
+        ) : null}
         <label cssName="detail-title" label="Bluetooth" hexpand halign={Gtk.Align.START} />
         <ToggleSwitch active={powered.as((p) => !!p)} onToggle={() => bt.toggle()} />
       </box>

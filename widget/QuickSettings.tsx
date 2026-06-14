@@ -55,10 +55,13 @@ const BAR_HEIGHT = 32 // = $bar-height
 const QS_GAP = 10 // gap between the bottom of the bar and the panel
 
 const QS_MARGIN_RIGHT = BAR_INSET // right edge aligned with the bar
-const QS_MARGIN_TOP = BAR_INSET + BAR_HEIGHT + QS_GAP // below the bar + the gap
+// Below the bar + the gap. Exported so the status-indicator menus drop to the same
+// height with the same gap.
+export const QS_MARGIN_TOP = BAR_INSET + BAR_HEIGHT + QS_GAP
 
-// Open/close slide duration (kept in sync with the Revealer below).
-const QS_ANIM_MS = 250
+// Open/close slide duration (kept in sync with the Revealer below). Exported so
+// the bar's status-indicator popovers animate with the same timing.
+export const QS_ANIM_MS = 250
 
 // Shared open state, animated. The window must stay mapped while the panel slides
 // out, so intent is split in two: `mapped` shows the window, `revealed` drives the

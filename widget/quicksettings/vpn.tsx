@@ -217,7 +217,7 @@ function VpnRow(props: {
   )
 }
 
-export function VpnPage(props: { onBack: () => void }) {
+export function VpnPage(props: { onBack?: () => void }) {
   const running = vpnIsActivePoll()
   const [profiles, setProfiles] = createState<VpnProfile[]>([])
   const [activeId, setActiveId] = createState("")
@@ -263,9 +263,11 @@ export function VpnPage(props: { onBack: () => void }) {
   return (
     <box cssName="detail-page" orientation={Gtk.Orientation.VERTICAL} spacing={12}>
       <box cssName="detail-header" spacing={10}>
-        <button cssName="detail-back" onClicked={props.onBack}>
-          <image iconName="go-previous-symbolic" />
-        </button>
+        {props.onBack ? (
+          <button cssName="detail-back" onClicked={props.onBack}>
+            <image iconName="go-previous-symbolic" />
+          </button>
+        ) : null}
         <label cssName="detail-title" label="VPN" hexpand halign={Gtk.Align.START} />
         <ToggleSwitch active={running} onToggle={toggleService} />
       </box>

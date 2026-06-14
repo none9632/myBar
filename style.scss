@@ -183,12 +183,32 @@ clock {
 // keep the foreground colour since they convey live state, not a category.
 status-indicators {
   background: $ramp-6;
-  padding: 2px 8px;
+  padding: 2px 4px;
   border-radius: 3px 0px 0px 3px;
 
+  // Size only — colour is inherited ($fg from the panel window).
   image {
     -gtk-icon-size: 16px;
+  }
+
+  // Each indicator is a flat button (Wi-Fi/BT/VPN open a settings menu, the mic
+  // toggles mute). Strip the theme's chrome so each reads as a bare icon, with a
+  // subtle accent tint on hover.
+  button {
+    background: none;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 2px 4px;
+    border-radius: calc(#{$radius} - 4px);
     color: $fg;
+
+    &:hover {
+      background: rgba($accent, 0.25);
+    }
   }
 }
 
@@ -274,6 +294,35 @@ popover.menu {
     background: rgba($fg, 0.12);
     margin: 4px 2px;
     min-height: 1px;
+  }
+}
+
+// ── Status-indicator menus ────────────────────────────────────────────────────
+// The Wi-Fi/Bluetooth/VPN settings open in their own overlay window (like Quick
+// Settings) that drops from under the bar button, so they get the same slide+fade
+// on open AND close. The window is transparent; the card paints the dark glass.
+// Being its own window, the content escapes the bar's bold/icon-colour rules, so
+// (like window.QuickSettings) we only need to set the font here.
+
+window.IndicatorMenu {
+  background: transparent;
+  font-family: $font;
+}
+
+indicator-menu-card {
+  background: $bg;
+  border-radius: $radius;
+  padding: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  color: $fg;
+
+  // Fades in together with the Revealer slide (.shown tracks the reveal state);
+  // keep this duration in sync with QS_ANIM_MS, like quick-settings-wrapper.
+  opacity: 0;
+  transition: opacity 250ms ease;
+
+  &.shown {
+    opacity: 1;
   }
 }
 

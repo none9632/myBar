@@ -157,7 +157,7 @@ export default function RightPanel(gdkmonitor: Gdk.Monitor) {
       application={app}
     >
       <box cssName="right-panel-inner" spacing={0}>
-        <StatusIndicators />
+        <StatusIndicators gdkmonitor={gdkmonitor} />
         <SystemTray />
         <BatteryWidget />
         <Updates />
