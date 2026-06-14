@@ -22,10 +22,18 @@ export function WifiToggle(props: { onClick: () => void }) {
   )
 }
 
+// Short band name from an AP frequency (MHz): 2.4 / 5 / 6 GHz.
+function bandOf(freq: number): string {
+  if (freq >= 5925) return "6"
+  if (freq >= 4900) return "5"
+  return "2.4"
+}
+
 function NetworkRow(props: {
   ap: Network.AccessPoint
   activeSsid: Accessor<string | null>
   saved: Accessor<Set<string>>
+  bands: Accessor<Map<string, string>>
   expandedRow: Accessor<string | null>
   setExpandedRow: (key: string | null) => void
 }) {
@@ -121,22 +129,30 @@ function NetworkRow(props: {
             halign={Gtk.Align.START}
             ellipsize={Pango.EllipsizeMode.END}
           />
-          <label cssName="detail-badge" label={props.ap.frequency >= 5000 ? "5 GHz" : "2.4 GHz"} />
-          <With value={status}>
-            {(s) =>
-              s === "connecting" ? (
-                <Gtk.Spinner spinning />
-              ) : s === "connected" ? (
-                <image iconName="object-select-symbolic" />
-              ) : s === "unlocked" ? (
-                <image cssName="wifi-lock" iconName="changes-allow-symbolic" />
-              ) : s === "locked" ? (
-                <image cssName="wifi-lock" iconName="changes-prevent-symbolic" />
-              ) : (
-                <box />
-              )
-            }
-          </With>
+          <label
+            cssName="detail-badge"
+            label={props.bands.as((m) => m.get(ssid ?? "") ?? `${bandOf(props.ap.frequency)} GHz`)}
+          />
+          {/* Fixed-size slot so the check (18px) / lock (14px) / spinner occupy the
+              same footprint and the frequency badge before them doesn't shift
+              between connected and other rows. */}
+          <box cssName="detail-status" halign={Gtk.Align.CENTER} valign={Gtk.Align.CENTER}>
+            <With value={status}>
+              {(s) =>
+                s === "connecting" ? (
+                  <Gtk.Spinner spinning />
+                ) : s === "connected" ? (
+                  <image iconName="object-select-symbolic" />
+                ) : s === "unlocked" ? (
+                  <image cssName="wifi-lock" iconName="changes-allow-symbolic" />
+                ) : s === "locked" ? (
+                  <image cssName="wifi-lock" iconName="changes-prevent-symbolic" />
+                ) : (
+                  <box />
+                )
+              }
+            </With>
+          </box>
         </box>
       </button>
 
@@ -186,6 +202,7 @@ function NetworkSection(props: {
   networks: Accessor<Network.AccessPoint[]>
   activeSsid: Accessor<string | null>
   saved: Accessor<Set<string>>
+  bands: Accessor<Map<string, string>>
   expandedRow: Accessor<string | null>
   setExpandedRow: (key: string | null) => void
 }) {
@@ -202,6 +219,7 @@ function NetworkSection(props: {
             ap={ap}
             activeSsid={props.activeSsid}
             saved={props.saved}
+            bands={props.bands}
             expandedRow={props.expandedRow}
             setExpandedRow={props.setExpandedRow}
           />
@@ -242,10 +260,11 @@ export function WifiPage(props: { onBack?: () => void }) {
   // Otherwise a periodic re-sort on fluctuating signal — or a savedNetworks refresh
   // moving a network between sections — would reorder/reparent the row being edited
   // and make GTK drop keyboard focus from its entry. Updates resume on field close.
-  let lastGroups: { saved: Network.AccessPoint[]; other: Network.AccessPoint[] } = {
-    saved: [],
-    other: [],
-  }
+  let lastGroups: {
+    saved: Network.AccessPoint[]
+    other: Network.AccessPoint[]
+    bands: Map<string, string>
+  } = { saved: [], other: [], bands: new Map() }
   const groups = createComputed(() => {
     if (expandedRow() !== null) return lastGroups
     const aps = apsBinding()
@@ -260,14 +279,38 @@ export function WifiPage(props: { onBack?: () => void }) {
             return b.strength - a.strength
           })
       : []
+    // Band(s) each SSID is on, across all its APs — e.g. "2.4/5 GHz" for a dual-band
+    // router — so a multi-band network reads as such instead of a plain single-band
+    // one. Built before the dedup below, which keeps only one AP per SSID.
+    const bandSets = new Map<string, Set<string>>()
+    for (const ap of sorted) {
+      let s = bandSets.get(ap.ssid!)
+      if (!s) bandSets.set(ap.ssid!, (s = new Set()))
+      s.add(bandOf(ap.frequency))
+    }
+    const bands = new Map<string, string>()
+    for (const [ssid, s] of bandSets) bands.set(ssid, `${[...s].sort().join("/")} GHz`)
+    // Collapse multi-band networks: a router broadcasting one SSID on 2.4 + 5 GHz
+    // exposes two APs (different BSSIDs, same name), so it would otherwise show as
+    // two rows — both "connected", since the active check is by SSID. Keep one row
+    // per SSID — the first in sort order, i.e. the connected AP if any, else the
+    // strongest. Connecting is by SSID, so the representative's band doesn't matter.
+    const seen = new Set<string>()
+    const unique = sorted.filter((ap) => {
+      if (seen.has(ap.ssid!)) return false
+      seen.add(ap.ssid!)
+      return true
+    })
     lastGroups = {
-      saved: sorted.filter((ap) => known.has(ap.ssid!)),
-      other: sorted.filter((ap) => !known.has(ap.ssid!)),
+      saved: unique.filter((ap) => known.has(ap.ssid!)),
+      other: unique.filter((ap) => !known.has(ap.ssid!)),
+      bands,
     }
     return lastGroups
   })
   const savedAps = groups.as((g) => g.saved)
   const otherAps = groups.as((g) => g.other)
+  const bands = groups.as((g) => g.bands)
 
   // LAN IPv4 of the Wi-Fi device itself (avoids picking up a VPN tunnel address).
   const ip = createPoll("—", 5000, [
@@ -309,6 +352,7 @@ export function WifiPage(props: { onBack?: () => void }) {
             networks={savedAps}
             activeSsid={activeSsid}
             saved={savedNetworks}
+            bands={bands}
             expandedRow={expandedRow}
             setExpandedRow={setExpandedRow}
           />
@@ -317,6 +361,7 @@ export function WifiPage(props: { onBack?: () => void }) {
             networks={otherAps}
             activeSsid={activeSsid}
             saved={savedNetworks}
+            bands={bands}
             expandedRow={expandedRow}
             setExpandedRow={setExpandedRow}
           />
