@@ -1,25 +1,19 @@
-import app from "ags/gtk4/app"
-import { Astal, Gtk, Gdk } from "ags/gtk4"
-import GLib from "gi://GLib"
-import { Accessor, createBinding, createComputed, createState, onCleanup, With } from "gnim"
+import { Gdk } from "ags/gtk4"
+import { Accessor, createBinding, createComputed } from "gnim"
 import { createPoll } from "ags/time"
 import Network from "gi://AstalNetwork?version=0.1"
 import Bluetooth from "gi://AstalBluetooth?version=0.1"
 import Wp from "gi://AstalWp?version=0.1"
-import { QS_ANIM_MS, QS_MARGIN_TOP } from "./QuickSettings"
+import BarMenu from "./BarMenu"
 import { WifiPage } from "./quicksettings/wifi"
 import { BluetoothPage } from "./quicksettings/bluetooth"
 import { VpnPage } from "./quicksettings/vpn"
 import { vpnIsActivePoll, getActiveVpnId, listVpnProfiles } from "./quicksettings/vpn-config"
 import { airplaneEnabledPoll } from "./quicksettings/airplane"
 
-// A bar indicator whose settings open in a small overlay window that drops from
-// under the button — built like the Quick Settings panel so it gets the same
-// slide+fade on BOTH open and close (a GtkPopover can't animate its close: it
-// tears its surface down instantly). A full-screen dismiss layer means Esc /
-// clicking outside / clicking the bar all close it. The page is built lazily while
-// open (<With> on `mapped`), so per-page side effects — Wi-Fi scan, Bluetooth
-// discovery — start on open and stop on close.
+// A bar indicator whose settings open in a card under the icon. Thin wrapper over
+// BarMenu (the shared overlay-window menu): the icon is the trigger button, the
+// page is the menu content.
 function IndicatorMenu(props: {
   name: string
   icon: string | Accessor<string>
@@ -28,141 +22,15 @@ function IndicatorMenu(props: {
   content: () => JSX.Element
   gdkmonitor: Gdk.Monitor
 }) {
-  const { TOP, BOTTOM, LEFT, RIGHT } = Astal.WindowAnchor
-
-  // `mapped` keeps the window shown while the card animates; `revealed` drives the
-  // slide+fade. Splitting them lets the close animation play before the window
-  // unmaps — same machinery as QuickSettings.tsx. `cardLeft` positions the card
-  // centred under the button.
-  const [mapped, setMapped] = createState(false)
-  const [revealed, setRevealed] = createState(false)
-  const [cardLeft, setCardLeft] = createState(0)
-  let isOpen = false
-  let closeTimer = 0
-  let btn: Gtk.Widget | null = null
-  // Card width, to centre it on the button. An estimate (detail-page min-width 320
-  // + 14px padding each side) until the card is first allocated, then its real
-  // measured width (see the card's tick callback). `openCenter` is captured at open
-  // so a width correction mid-open re-centres around the same point.
-  let cardWidth = 348
-  let openCenter = 0
-
-  // Screen-x of the button's centre. The bar window is anchored to the right, so its
-  // left edge sits at (monitor width − bar width); add the button's centre within
-  // the bar. All in GTK logical px, which is what marginStart wants.
-  function buttonCenterX(): number {
-    const root = btn?.get_root()
-    if (!btn || !root) return openCenter
-    const [ok, b] = btn.compute_bounds(root)
-    if (!ok) return openCenter
-    return (
-      props.gdkmonitor.get_geometry().width - root.get_width() + b.get_x() + b.get_width() / 2
-    )
-  }
-
-  function open() {
-    isOpen = true
-    if (closeTimer) {
-      GLib.source_remove(closeTimer)
-      closeTimer = 0
-    }
-    openCenter = buttonCenterX()
-    setCardLeft(openCenter - cardWidth / 2)
-    setMapped(true)
-    // Let the window map first; revealing in the same frame snaps.
-    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 20, () => {
-      if (isOpen) setRevealed(true)
-      return GLib.SOURCE_REMOVE
-    })
-  }
-
-  function close() {
-    isOpen = false
-    setRevealed(false)
-    if (closeTimer) GLib.source_remove(closeTimer)
-    // Unmap only after the slide-out has played.
-    closeTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, QS_ANIM_MS, () => {
-      if (!isOpen) setMapped(false)
-      closeTimer = 0
-      return GLib.SOURCE_REMOVE
-    })
-  }
-
-  // The overlay window (self-registers via application={app}), mirroring the Quick
-  // Settings panel: a full-screen dismiss area + a Revealer that slides the card
-  // down from under the bar.
-  ;(
-    <window
-      visible={mapped}
-      name={`indicator-${props.name}`}
-      // No custom namespace: fall under the default "gtk4-layer-shell" so Hyprland's
-      // blur layer-rule (which matches that namespace) applies, like the bar itself.
-      class="IndicatorMenu"
-      gdkmonitor={props.gdkmonitor}
-      anchor={TOP | BOTTOM | LEFT | RIGHT}
-      exclusivity={Astal.Exclusivity.IGNORE}
-      keymode={Astal.Keymode.EXCLUSIVE}
-      layer={Astal.Layer.OVERLAY}
-      application={app}
-    >
-      <Gtk.EventControllerKey
-        onKeyPressed={(_self, keyval) => {
-          if (keyval === Gdk.KEY_Escape) close()
-          return false
-        }}
-      />
-      <overlay>
-        {/* Main child: full-screen dismiss area. */}
-        <box>
-          <Gtk.GestureClick onPressed={() => close()} />
-        </box>
-        {/* Overlay child: the card, dropping straight under the button. */}
-        <revealer
-          $type="overlay"
-          halign={Gtk.Align.START}
-          valign={Gtk.Align.START}
-          marginStart={cardLeft}
-          marginTop={QS_MARGIN_TOP}
-          revealChild={revealed}
-          transitionType={Gtk.RevealerTransitionType.SLIDE_DOWN}
-          transitionDuration={QS_ANIM_MS}
-        >
-          <box
-            cssName="indicator-menu-card"
-            class={revealed.as((r) => (r ? "shown" : ""))}
-            $={(self: Gtk.Widget) => {
-              // Measure the real card width once allocated and re-centre on the
-              // button (still invisible behind the fade, so no visible jump). The
-              // width is stable per page, so stop ticking after the first reading.
-              self.add_tick_callback(() => {
-                const w = self.get_width()
-                if (w <= 0) return GLib.SOURCE_CONTINUE
-                if (w !== cardWidth) {
-                  cardWidth = w
-                  if (isOpen) setCardLeft(openCenter - w / 2)
-                }
-                return GLib.SOURCE_REMOVE
-              })
-            }}
-          >
-            <With value={mapped}>{(m) => (m ? props.content() : <box />)}</With>
-          </box>
-        </revealer>
-      </overlay>
-    </window>
-  )
-
   return (
-    <button
+    <BarMenu
+      name={props.name}
+      gdkmonitor={props.gdkmonitor}
+      tooltip={props.tooltip}
       visible={props.visible}
-      tooltipText={props.tooltip}
-      onClicked={() => (isOpen ? close() : open())}
-      $={(self: Gtk.Widget) => {
-        btn = self
-      }}
-    >
-      <image iconName={props.icon} />
-    </button>
+      content={props.content}
+      button={<image iconName={props.icon} />}
+    />
   )
 }
 

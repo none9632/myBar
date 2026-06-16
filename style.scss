@@ -168,6 +168,12 @@ battery {
 
 clock {
   background: $ramp-1;
+  // Now a button (drops the calendar) — flatten the theme's chrome so it still
+  // reads as a flush chip.
+  border: none;
+  box-shadow: none;
+  outline: none;
+  border-radius: 0;
 
   time {
     font-weight: bold;
@@ -176,6 +182,10 @@ clock {
 
   date {
     color: $subtext;
+  }
+
+  &:hover {
+    background: $ramp-2;
   }
 }
 
@@ -297,19 +307,19 @@ popover.menu {
   }
 }
 
-// ── Status-indicator menus ────────────────────────────────────────────────────
-// The Wi-Fi/Bluetooth/VPN settings open in their own overlay window (like Quick
-// Settings) that drops from under the bar button, so they get the same slide+fade
-// on open AND close. The window is transparent; the card paints the dark glass.
-// Being its own window, the content escapes the bar's bold/icon-colour rules, so
-// (like window.QuickSettings) we only need to set the font here.
+// ── Bar menus ─────────────────────────────────────────────────────────────────
+// Status-indicator menus (Wi-Fi/BT/VPN) and the clock calendar open in their own
+// overlay window (like Quick Settings) that drops from under the bar button, for
+// the same slide+fade on open AND close. The window is transparent; the card
+// paints the dark glass. Being its own window, the content escapes the bar's
+// bold/icon-colour rules, so (like window.QuickSettings) we only set the font here.
 
-window.IndicatorMenu {
+window.BarMenu {
   background: transparent;
   font-family: $font;
 }
 
-indicator-menu-card {
+bar-menu-card {
   background: $bg;
   border-radius: $radius;
   padding: 14px;
@@ -323,6 +333,63 @@ indicator-menu-card {
 
   &.shown {
     opacity: 1;
+  }
+}
+
+// ── Clock calendar ────────────────────────────────────────────────────────────
+
+calendar-menu {
+  min-width: 280px;
+}
+
+calendar {
+  background: transparent;
+  color: $fg;
+
+  // Month/year heading + ‹ › navigation.
+  > header {
+    color: $fg;
+
+    button {
+      background: none;
+      border: none;
+      box-shadow: none;
+      color: $fg;
+
+      &:hover {
+        background: $active-bg;
+      }
+    }
+  }
+
+  // Day cells (grid of numbers + the day-name row).
+  label {
+    color: $fg;
+
+    &.day-name {
+      color: $subtext;
+      font-size: 0.8em;
+    }
+
+    &.other-month {
+      color: $subtext;
+      opacity: 0.5;
+    }
+  }
+
+  // GtkCalendar keeps a day-of-month selected as you page through months, so the
+  // selection would highlight that day in EVERY month. Neutralize it and mark only
+  // the real current date — GTK adds .today only in the live month/year.
+  :selected {
+    background: transparent;
+    color: $fg;
+  }
+
+  label.today {
+    background: $accent;
+    color: $accent-fg;
+    border-radius: 4px;
+    font-weight: bold;
   }
 }
 

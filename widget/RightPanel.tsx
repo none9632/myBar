@@ -5,6 +5,7 @@ import { createPoll, interval } from "ags/time"
 import { createBinding, createState, onCleanup } from "gnim"
 import Battery from "gi://AstalBattery?version=0.1"
 import Hyprland from "gi://AstalHyprland?version=0.1"
+import BarMenu from "./BarMenu"
 import QuickSettingsWindow, { toggleQs } from "./QuickSettings"
 import StatusIndicators from "./StatusIndicators"
 import SystemTray from "./SystemTray"
@@ -122,15 +123,33 @@ function BatteryWidget() {
   )
 }
 
-function Clock() {
+// Month calendar shown when the clock is clicked.
+function CalendarMenu() {
+  return (
+    <box cssName="calendar-menu" orientation={Gtk.Orientation.VERTICAL}>
+      <Gtk.Calendar />
+    </box>
+  )
+}
+
+// Date + time, as a button that drops a calendar (via BarMenu).
+function Clock(props: { gdkmonitor: Gdk.Monitor }) {
   const time = createPoll("", 1000, "date +'%H:%M'")
   const date = createPoll("", 60000, "date +'%d %b'")
 
   return (
-    <box cssName="clock" spacing={6}>
-      <label cssName="date" label={date} />
-      <label cssName="time" label={time} />
-    </box>
+    <BarMenu
+      name="calendar"
+      gdkmonitor={props.gdkmonitor}
+      buttonCssName="clock"
+      content={() => <CalendarMenu />}
+      button={
+        <box spacing={6}>
+          <label cssName="date" label={date} />
+          <label cssName="time" label={time} />
+        </box>
+      }
+    />
   )
 }
 
@@ -162,7 +181,7 @@ export default function RightPanel(gdkmonitor: Gdk.Monitor) {
         <BatteryWidget />
         <Updates />
         <KbLayout />
-        <Clock />
+        <Clock gdkmonitor={gdkmonitor} />
         <button cssName="qs-button" onClicked={() => toggleQs()}>
           <image iconName="view-grid-symbolic" />
         </button>
