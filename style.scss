@@ -849,6 +849,55 @@ toggle-switch {
     margin-left: 25px;
     background: $accent-fg;
   }
+
+  // While the backing service/radio catches up with the click, the knob has
+  // already slid to the requested side (set optimistically in ToggleSwitch); the
+  // whole switch fades in and out to show it's working rather than stuck. Dropped
+  // the moment the real state confirms.
+  &.pending {
+    animation: toggle-working 1100ms ease-in-out infinite;
+  }
+
+  // Press feedback: on each click the knob briefly grows a few px and springs back
+  // (the `.pop` class is added per-press in ToggleSwitch, POP_MS = 260). The growth
+  // is absorbed by the knob's own margins — top/bottom keep it vertically centred,
+  // right keeps the capsule's footprint fixed — so only the knob swells, not the
+  // track. margin-left is left untouched so the on/off slide still owns horizontal
+  // motion.
+  &.pop knob {
+    animation: knob-pop 260ms ease-out;
+  }
+}
+
+@keyframes toggle-working {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+// Grow the knob ~3px and settle back. Only min-size + top/bottom/right margins
+// move; their sum with the (untouched) margin-left keeps the knob's footprint at
+// 22px both ways, so the capsule never resizes — the knob just swells in place.
+@keyframes knob-pop {
+  0%,
+  100% {
+    min-width: 16px;
+    min-height: 16px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    margin-right: 3px;
+  }
+  45% {
+    min-width: 19px;
+    min-height: 19px;
+    margin-top: 1.5px;
+    margin-bottom: 1.5px;
+    margin-right: 0;
+  }
 }
 
 // ── Inline row context menu (Wi-Fi networks + Bluetooth devices) ───────────────

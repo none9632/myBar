@@ -147,23 +147,30 @@ export function listVpnProfiles(): VpnProfile[] {
       Gio.FileQueryInfoFlags.NONE,
       null,
     )
-    let info: Gio.FileInfo | null
-    while ((info = en.next_file(null)) !== null) {
-      const fname = info.get_name()
-      if (!fname.endsWith(".json")) continue
-      try {
-        const data = JSON.parse(readFile(`${VPN_PROFILES_DIR}/${fname}`))
-        if (data?.outbound?.server) {
-          profiles.push({
-            id: fname.replace(/\.json$/, ""),
-            name: data.name || data.outbound.server,
-            link: data.link || "",
-            outbound: data.outbound,
-          })
+    // Always close the enumerator: it holds an open directory fd, and this runs on
+    // a 2s poll (the VPN tooltip), so leaking it exhausts the fd limit and crashes
+    // the bar after a while ("Too many open files").
+    try {
+      let info: Gio.FileInfo | null
+      while ((info = en.next_file(null)) !== null) {
+        const fname = info.get_name()
+        if (!fname.endsWith(".json")) continue
+        try {
+          const data = JSON.parse(readFile(`${VPN_PROFILES_DIR}/${fname}`))
+          if (data?.outbound?.server) {
+            profiles.push({
+              id: fname.replace(/\.json$/, ""),
+              name: data.name || data.outbound.server,
+              link: data.link || "",
+              outbound: data.outbound,
+            })
+          }
+        } catch (e) {
+          console.error("vpn profile parse:", fname, "->", String(e))
         }
-      } catch (e) {
-        console.error("vpn profile parse:", fname, "->", String(e))
       }
+    } finally {
+      en.close(null)
     }
   } catch (e) {
     console.error("vpn list profiles:", String(e))

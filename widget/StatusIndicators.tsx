@@ -83,7 +83,13 @@ export default function StatusIndicators(props: { gdkmonitor: Gdk.Monitor }) {
   const btPowered = createBinding(bt, "isPowered")
   const btDevices = createBinding(bt, "devices")
   const btConnected = btDevices.as((ds) => ds.some((d) => d.connected))
+  // Off (crossed) / on but no device / connected (filled).
+  const btIcon = createComputed(() => {
+    if (!btPowered()) return "bluetooth-disabled-symbolic"
+    return btConnected() ? "bluetooth-active-symbolic" : "bluetooth-symbolic"
+  })
   const btTooltip = createComputed(() => {
+    if (!btPowered()) return "Bluetooth: off"
     const names = btDevices()
       .filter((d) => d.connected)
       .map((d) => d.alias || d.name)
@@ -97,7 +103,11 @@ export default function StatusIndicators(props: { gdkmonitor: Gdk.Monitor }) {
     if (!id) return ""
     return listVpnProfiles().find((p) => p.id === id)?.outbound.server ?? ""
   })
-  const vpnTooltip = vpnServer.as((s) => (s ? `VPN: ${s}` : "VPN connected"))
+  const vpnTooltip = createComputed(() => {
+    if (!vpnActive()) return "VPN: off"
+    const s = vpnServer()
+    return s ? `VPN: ${s}` : "VPN connected"
+  })
 
   const airplane = airplaneEnabledPoll()
 
@@ -117,21 +127,21 @@ export default function StatusIndicators(props: { gdkmonitor: Gdk.Monitor }) {
         content={() => <WifiPage />}
         gdkmonitor={props.gdkmonitor}
       />
-      {/* Bluetooth: filled icon when a device is connected. */}
+      {/* Bluetooth: always shown; icon reflects off / on / connected. */}
       <IndicatorMenu
         name="bluetooth"
-        icon={btConnected.as((c) => (c ? "bluetooth-active-symbolic" : "bluetooth-symbolic"))}
+        icon={btIcon}
         tooltip={btTooltip}
-        visible={btPowered.as((p) => !!p)}
         content={() => <BluetoothPage />}
         gdkmonitor={props.gdkmonitor}
       />
-      {/* VPN (sing-box) running. */}
+      {/* VPN (sing-box): always shown; the icon reflects connected/disconnected. */}
       <IndicatorMenu
         name="vpn"
-        icon="network-vpn-symbolic"
+        icon={vpnActive.as((a) =>
+          a ? "network-vpn-symbolic" : "network-vpn-disconnected-symbolic",
+        )}
         tooltip={vpnTooltip}
-        visible={vpnActive}
         content={() => <VpnPage />}
         gdkmonitor={props.gdkmonitor}
       />
