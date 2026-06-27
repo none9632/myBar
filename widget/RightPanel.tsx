@@ -9,10 +9,7 @@ import BarMenu from "./BarMenu"
 import QuickSettingsWindow, { toggleQs } from "./QuickSettings"
 import StatusIndicators from "./StatusIndicators"
 import SystemTray from "./SystemTray"
-
-// Command to count available updates (official repos + AUR).
-const UPDATE_CHECK_CMD = ["bash", "-c", "(checkupdates; yay -Qua) 2>/dev/null | wc -l"]
-const UPDATE_INTERVAL = 30 * 60 * 1000 // 30 minutes
+import Updates from "./Updates"
 
 function shortLayout(layout: string): string {
   return layout.replace(/\s*\(.*\)/, "").slice(0, 2).toUpperCase()
@@ -42,22 +39,6 @@ function KbLayout() {
     <box cssName="kb-layout" spacing={4}>
       <label cssName="kb-icon" label="䂌" />
       <label label={layout} />
-    </box>
-  )
-}
-
-function Updates() {
-  // -1 = not fetched yet; the first poll replaces it with the real count. The
-  // chip stays visible while loading (showing "..") and once there are updates,
-  // and hides only after a successful check reports zero.
-  const count = createPoll(-1, UPDATE_INTERVAL, UPDATE_CHECK_CMD, (out) =>
-    parseInt(out.trim(), 10) || 0,
-  )
-
-  return (
-    <box cssName="updates" spacing={4} visible={count.as((n) => n !== 0)}>
-      <label cssName="updates-icon" label="䂍" />
-      <label label={count.as((n) => (n < 0 ? "..." : `${n}`))} />
     </box>
   )
 }
@@ -179,7 +160,7 @@ export default function RightPanel(gdkmonitor: Gdk.Monitor) {
         <StatusIndicators gdkmonitor={gdkmonitor} />
         <SystemTray />
         <BatteryWidget />
-        <Updates />
+        <Updates gdkmonitor={gdkmonitor} />
         <KbLayout />
         <Clock gdkmonitor={gdkmonitor} />
         <button cssName="qs-button" onClicked={() => toggleQs()}>
