@@ -105,9 +105,17 @@ export default function BarMenu(props: {
       layer={Astal.Layer.OVERLAY}
       application={app}
     >
+      {/* CAPTURE phase: a focused child (the search/password entry) swallows
+          Escape in the normal bubble phase, leaving the menu open. Catching it on
+          the way down, at the window, makes Escape close reliably regardless of
+          what holds focus. */}
       <Gtk.EventControllerKey
+        propagationPhase={Gtk.PropagationPhase.CAPTURE}
         onKeyPressed={(_self, keyval) => {
-          if (keyval === Gdk.KEY_Escape) close()
+          if (keyval === Gdk.KEY_Escape) {
+            close()
+            return true
+          }
           return false
         }}
       />

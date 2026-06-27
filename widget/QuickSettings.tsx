@@ -130,14 +130,18 @@ export default function QuickSettingsWindow(props: { gdkmonitor: Gdk.Monitor }) 
       layer={Astal.Layer.OVERLAY}
       application={app}
     >
-      {/* Key controller on the window itself so Escape is received regardless
-          of which inner widget (if any) holds focus. */}
+      {/* Key controller on the window itself so Escape is received regardless of
+          which inner widget holds focus. CAPTURE phase is essential: a focused
+          entry (Wi-Fi password / VPN add field) swallows Escape in the bubble
+          phase, so we must intercept it on the way down. */}
       <Gtk.EventControllerKey
+        propagationPhase={Gtk.PropagationPhase.CAPTURE}
         onKeyPressed={(_self, keyval) => {
           if (keyval === Gdk.KEY_Escape) {
             // On a detail page Escape goes back to main; on main it closes.
             if (page.peek() !== "main") setPage("main")
             else closeAll()
+            return true
           }
           return false
         }}
