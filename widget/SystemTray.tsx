@@ -55,7 +55,7 @@ export default function SystemTray() {
   const anyShowable = items.as((arr) => arr.some((it) => it.gicon != null))
 
   return (
-    <box cssName="system-tray" spacing={3} visible={anyShowable}>
+    <box cssName="system-tray" visible={anyShowable}>
       {/* Key by item_id (AstalTray's unique handle), NOT id — id is the
           app-supplied name and is often empty/duplicated. Duplicate keys make
           <For> drop or leave stale buttons. Icon-less ghosts are hidden per

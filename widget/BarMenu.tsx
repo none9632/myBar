@@ -8,9 +8,9 @@ import { QS_ANIM_MS, QS_MARGIN_TOP } from "./QuickSettings"
 // same machinery as the Quick Settings panel: slide+fade on BOTH open and close
 // (a GtkPopover can't animate its close), a full-screen dismiss layer (Esc /
 // clicking outside / clicking the bar all close it), and the card centred on the
-// button. Used for the status-indicator menus and the clock calendar. The card is
-// built lazily while open (<With> on `mapped`) so the content's side effects start
-// on open and stop on close.
+// button. Used for the status-indicator menus, the updates list, and the clock
+// calendar. The card is built lazily while open (<With> on `mapped`) so the
+// content's side effects start on open and stop on close.
 export default function BarMenu(props: {
   name: string
   gdkmonitor: Gdk.Monitor
@@ -19,6 +19,9 @@ export default function BarMenu(props: {
   // Menu content, built lazily each time the menu opens.
   content: () => JSX.Element
   buttonCssName?: string
+  // Extra style class on the trigger button, for targeting one menu among several
+  // that share a node name (e.g. the individual status-indicator buttons).
+  buttonClass?: string
   tooltip?: string | Accessor<string>
   visible?: Accessor<boolean>
 }) {
@@ -165,6 +168,7 @@ export default function BarMenu(props: {
   return (
     <button
       cssName={props.buttonCssName}
+      class={props.buttonClass}
       visible={props.visible}
       tooltipText={props.tooltip}
       onClicked={() => (isOpen ? close() : open())}

@@ -26,6 +26,9 @@ function IndicatorMenu(props: {
     <BarMenu
       name={props.name}
       gdkmonitor={props.gdkmonitor}
+      // Tag each trigger with its name so it can be styled on its own (see the
+      // `status-indicators button.<name>` rules in style.scss).
+      buttonClass={props.name}
       tooltip={props.tooltip}
       visible={props.visible}
       content={props.content}
@@ -116,7 +119,7 @@ export default function StatusIndicators(props: { gdkmonitor: Gdk.Monitor }) {
   const micMuted = mic ? createBinding(mic, "mute") : null
 
   return (
-    <box cssName="status-indicators" spacing={3}>
+    <box cssName="status-indicators">
       {/* Wi-Fi: disabled (crossed) / connecting (dots) / connected (signal bars).
           Click opens the Wi-Fi settings popover under the button. */}
       <IndicatorMenu
@@ -155,6 +158,7 @@ export default function StatusIndicators(props: { gdkmonitor: Gdk.Monitor }) {
           icon flips between active and disabled. */}
       {micMuted && mic ? (
         <button
+          class="mic"
           tooltipText={micMuted.as((m) => (m ? "Microphone muted" : "Microphone on"))}
           onClicked={() => (mic.mute = !mic.mute)}
         >

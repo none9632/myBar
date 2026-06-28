@@ -31,8 +31,7 @@ $radius:    map.get($t, "radius");
 
 // ── Font ──────────────────────────────────────────────────────────────────────
 // Font family for both panels and the Quick Settings overlay. Change this one
-// value to restyle all of them. Installed alternatives: "Iosevka Nerd Font",
-// "FiraCode Nerd Font", "Hack Nerd Font", "Adwaita Sans".
+// value to restyle all of them.
 
 $font: "Inter";
 
@@ -56,7 +55,10 @@ $ramp-2: rgba(37, 49, 55, 0.8);     // kb-layout
 $ramp-3: rgba(41, 54, 62, 0.8);     // updates
 $ramp-4: rgba(46, 60, 68, 0.8);     // battery
 $ramp-5: rgba(50, 66, 75, 0.8);     // system-tray
-$ramp-6: rgba(54, 72, 82, 0.8);
+$ramp-6: rgba(54, 72, 82, 0.8);     // status-indicators
+$ramp-7: rgba(58, 78, 89, 0.8);     // ramp-6 + (4, 6, 7)
+$ramp-8: rgba(62, 84, 96, 0.8);     // ramp-7 + (4, 6, 7)
+$ramp-9: rgba(66, 90, 103, 0.8);    // ramp-8 + (4, 6, 7)
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -162,7 +164,7 @@ updates {
   }
 
   &:hover {
-    background: $ramp-4;
+    background: $ramp-6;
   }
 }
 
@@ -196,7 +198,7 @@ clock {
   }
 
   &:hover {
-    background: $ramp-2;
+    background: $ramp-4;
   }
 }
 
@@ -204,7 +206,7 @@ clock {
 // keep the foreground colour since they convey live state, not a category.
 status-indicators {
   background: $ramp-6;
-  padding: 2px 4px;
+  padding: 0;
   border-radius: 3px 0px 0px 3px;
 
   // Size only — colour is inherited ($fg from the panel window).
@@ -214,7 +216,7 @@ status-indicators {
 
   // Each indicator is a flat button (Wi-Fi/BT/VPN open a settings menu, the mic
   // toggles mute). Strip the theme's chrome so each reads as a bare icon, with a
-  // subtle accent tint on hover.
+  // subtle brighter tint on hover.
   button {
     background: none;
     border: none;
@@ -223,12 +225,16 @@ status-indicators {
     min-height: 0;
     min-width: 0;
     margin: 0;
-    padding: 2px 4px;
-    border-radius: calc(#{$radius} - 4px);
+    padding: 2px 8px;
+    border-radius: 0;
     color: $fg;
 
     &:hover {
-      background: rgba($accent, 0.25);
+      background: $ramp-9;
+    }
+    
+    &.wifi {
+      border-radius: 3px 0px 0px 3px;
     }
   }
 }
@@ -239,7 +245,7 @@ status-indicators {
 
 system-tray {
   background: $ramp-5;
-  padding: 2px 6px;
+  padding: 0;
   border-radius: 0px;
   min-height: $content-height;
 
@@ -254,12 +260,12 @@ system-tray {
       min-height: 0;
       min-width: 0;
       margin: 0;
-      padding: 0 4px;
-      border-radius: calc(#{$radius} - 4px);
+      padding: 2px 8px;
+      border-radius: 0;
       color: $fg;
 
       &:hover {
-        background: rgba($accent, 0.25);
+        background: $ramp-8;
       }
     }
 
@@ -527,7 +533,7 @@ qs-button {
   }
 
   &:hover {
-    background: $ramp-1;
+    background: $ramp-3;
   }
 }
 
