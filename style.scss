@@ -59,6 +59,8 @@ $ramp-6: rgba(54, 72, 82, 0.8);     // status-indicators
 $ramp-7: rgba(58, 78, 89, 0.8);     // ramp-6 + (4, 6, 7)
 $ramp-8: rgba(62, 84, 96, 0.8);     // ramp-7 + (4, 6, 7)
 $ramp-9: rgba(66, 90, 103, 0.8);    // ramp-8 + (4, 6, 7)
+$ramp-10: rgba(70, 96, 110, 0.9);    // ramp-9 + (4, 6, 7)
+$ramp-11: rgba(74, 100, 117, 0.8);    // ramp-9 + (4, 6, 7)
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +167,7 @@ updates {
 
   &:hover {
     background: $ramp-6;
+    box-shadow: inset 0 0 0 2px $ramp-8;
   }
 }
 
@@ -199,6 +202,7 @@ clock {
 
   &:hover {
     background: $ramp-4;
+    box-shadow: inset 0 0 0 2px $ramp-6;
   }
 }
 
@@ -215,8 +219,9 @@ status-indicators {
   }
 
   // Each indicator is a flat button (Wi-Fi/BT/VPN open a settings menu, the mic
-  // toggles mute). Strip the theme's chrome so each reads as a bare icon, with a
-  // subtle brighter tint on hover.
+  // toggles mute). Strip the theme's chrome so each reads as a bare icon, with an
+  // accent outline on hover — visible on any wallpaper, and it leaves the icons and
+  // the glassy fill untouched.
   button {
     background: none;
     border: none;
@@ -231,6 +236,7 @@ status-indicators {
 
     &:hover {
       background: $ramp-9;
+      box-shadow: inset 0 0 0 2px $ramp-11;
     }
     
     &.wifi {
@@ -241,7 +247,7 @@ status-indicators {
 
 // ── System tray ───────────────────────────────────────────────────────────────
 // A single neutral chip (like the status indicators) holding all SNI items with
-// no gaps between them; each item is a flat button that only tints on hover.
+// no gaps between them; each item is a flat button outlined in accent on hover.
 
 system-tray {
   background: $ramp-5;
@@ -266,6 +272,7 @@ system-tray {
 
       &:hover {
         background: $ramp-8;
+        box-shadow: inset 0 0 0 2px $ramp-10;
       }
     }
 
@@ -462,6 +469,54 @@ updates-menu {
   }
 }
 
+// ── List scrollbars (Wi-Fi / Bluetooth / VPN / updates lists) ──────────────────
+// A slim, rounded slider themed like the chips, replacing GTK's default bar.
+// Overlay scrolling (GTK default) auto-hides it: it fades in on scroll/hover and
+// out when idle, floating over the right edge of the rows.
+detail-list,
+updates-list {
+  scrollbar {
+    background: transparent;
+    border: none;
+    // The theme reserves the gutter via the scrollbar's own min-width + padding,
+    // so min-width on the slider alone can't make it thinner — zero these too.
+    min-width: 0;
+    padding: 0;
+    margin-left: -9px;
+    margin-top: -9px;
+    margin-bottom: -9px;
+
+    trough {
+      background: transparent;
+      border: none;
+      padding: 0;
+      min-width: 8px;
+      margin-left: -6px;
+      margin-right: -8px;
+    }
+
+    slider {
+      min-width: 8px;
+      min-height: 28px;
+      // The theme also pads the slider's width with a margin (and a transparent
+      // border for a bigger grab area); drop both so min-width actually drives it.
+      margin: 0;
+      border: none;
+      border-radius: 2px;
+      background: $ramp-7;
+      transition: background-color 150ms ease;
+
+      &:hover {
+        background: $ramp-10;
+      }
+
+      &:active {
+        background: $ramp-10;
+      }
+    }
+  }
+}
+
 // ── Clock calendar ────────────────────────────────────────────────────────────
 
 calendar-menu {
@@ -534,6 +589,7 @@ qs-button {
 
   &:hover {
     background: $ramp-3;
+    box-shadow: inset 0 0 0 2px $ramp-5;
   }
 }
 
