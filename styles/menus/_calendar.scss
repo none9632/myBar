@@ -1,0 +1,58 @@
+@use "../abstracts/variables" as *;
+
+// ── Clock calendar ────────────────────────────────────────────────────────────
+
+calendar-menu {
+  min-width: 280px;
+}
+
+calendar {
+  background: transparent;
+  color: $fg;
+
+  // Month/year heading + ‹ › navigation.
+  > header {
+    color: $fg;
+
+    button {
+      background: none;
+      border: none;
+      box-shadow: none;
+      color: $fg;
+
+      &:hover {
+        background: $active-bg;
+      }
+    }
+  }
+
+  // Day cells (grid of numbers + the day-name row).
+  label {
+    color: $fg;
+
+    &.day-name {
+      color: $subtext;
+      font-size: 0.8em;
+    }
+
+    &.other-month {
+      color: $subtext;
+      opacity: 0.5;
+    }
+  }
+
+  // GtkCalendar keeps a day-of-month selected as you page through months, so the
+  // selection would highlight that day in EVERY month. Neutralize it and mark only
+  // the real current date — GTK adds .today only in the live month/year.
+  :selected {
+    background: transparent;
+    color: $fg;
+  }
+
+  label.today {
+    background: $accent;
+    color: $accent-fg;
+    border-radius: 4px;
+    font-weight: bold;
+  }
+}

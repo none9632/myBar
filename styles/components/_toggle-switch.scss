@@ -1,0 +1,89 @@
+@use "../abstracts/variables" as *;
+
+// ── Shared on/off toggle ──────────────────────────────────────────────────────
+// Custom toggle (a styled button) instead of GtkSwitch: GtkSwitch only flips its
+// `:checked` state — and thus the track colour — AFTER the knob finishes its
+// hard-coded slide, so the colour always lagged the knob. Here a single `.on`
+// class drives both the knob's margin and the track colour with the same
+// transition, so they move in perfect lockstep. A capsule track with a round
+// knob that slides across.
+toggle-switch {
+  min-width: 44px;
+  min-height: 22px;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  border-radius: 999px;
+  background: $active-bg;
+  transition: background-color 150ms ease;
+
+  &.on {
+    background: $accent;
+  }
+
+  // Round knob inset from the capsule edge; only margin-left animates it across.
+  knob {
+    min-width: 16px;
+    min-height: 16px;
+    margin: 3px;
+    border-radius: 999px;
+    background: $fg;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    transition: margin-left 150ms ease;
+  }
+
+  // Travel = track width − knob width − right inset (44 − 16 − 3 = 25).
+  &.on knob {
+    margin-left: 25px;
+    background: $accent-fg;
+  }
+
+  // While the backing service/radio catches up with the click, the knob has
+  // already slid to the requested side (set optimistically in ToggleSwitch); the
+  // whole switch fades in and out to show it's working rather than stuck. Dropped
+  // the moment the real state confirms.
+  &.pending {
+    animation: toggle-working 1100ms ease-in-out infinite;
+  }
+
+  // Press feedback: on each click the knob briefly grows a few px and springs back
+  // (the `.pop` class is added per-press in ToggleSwitch, POP_MS = 260). The growth
+  // is absorbed by the knob's own margins — top/bottom keep it vertically centred,
+  // right keeps the capsule's footprint fixed — so only the knob swells, not the
+  // track. margin-left is left untouched so the on/off slide still owns horizontal
+  // motion.
+  &.pop knob {
+    animation: knob-pop 260ms ease-out;
+  }
+}
+
+@keyframes toggle-working {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+// Grow the knob ~3px and settle back. Only min-size + top/bottom/right margins
+// move; their sum with the (untouched) margin-left keeps the knob's footprint at
+// 22px both ways, so the capsule never resizes — the knob just swells in place.
+@keyframes knob-pop {
+  0%,
+  100% {
+    min-width: 16px;
+    min-height: 16px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    margin-right: 3px;
+  }
+  45% {
+    min-width: 19px;
+    min-height: 19px;
+    margin-top: 1.5px;
+    margin-bottom: 1.5px;
+    margin-right: 0;
+  }
+}

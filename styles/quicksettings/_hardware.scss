@@ -1,0 +1,116 @@
+@use "../abstracts/variables" as *;
+
+// ── Hardware readout (bottom of Quick Settings) ───────────────────────────────
+
+qs-hardware {
+  // Set off from the sliders above by a hairline.
+  border-top: 1px solid $active-bg;
+  padding-top: 10px;
+
+  hw-row {
+    min-height: 22px;
+
+    // Fixed icon column. min-width must exceed the widest glyph's advance so
+    // every mark's label is exactly this width and their centres line up — a
+    // narrower min-width lets a wide glyph (the Nerd microchip) grow its label
+    // and drift its centre rightward relative to the others.
+    // Network mark (symbolic icon).
+    hw-icon {
+      -gtk-icon-size: 16px;
+      color: $blue;
+      min-width: 28px;
+    }
+
+    // RAM / Temp marks: glyphs from the user's MyFont, aligned to the same
+    // column width as the symbolic network icon above. Each metric gets its own
+    // colour (from the user's waybar).
+    hw-glyph {
+      font-family: "MyFont";
+      font-size: 20px;
+      color: $subtext;
+      min-width: 28px;
+
+      &.ram {
+        color: $green;
+      }
+
+      &.temp {
+        color: $orange;
+      }
+
+      // CPU uses a Font Awesome glyph from a Nerd Font instead. That glyph has
+      // extra left-side bearing, so it sits further right than the MyFont marks
+      // — nudge it back. The opposite right margin keeps the label's footprint
+      // unchanged so the "CPU" text still lines up with the rows below. Tune the
+      // pixel value to taste.
+      &.nerd {
+        font-family: "Iosevka Nerd Font";
+        color: $red;
+        margin-left: -4px;
+        margin-right: 4px;
+      }
+
+      // Disk uses a Nerd Font glyph too; nudge it like CPU (tune to taste).
+      &.disk {
+        font-family: "Iosevka Nerd Font";
+        color: $brown;
+        margin-left: -5px;
+        margin-right: 5px;
+      }
+    }
+
+    hw-label {
+      color: $subtext;
+      min-width: 42px;
+    }
+
+    hw-value {
+      color: $fg;
+      font-weight: bold;
+      font-size: 0.9em;
+    }
+
+    // CPU / RAM / Temp bar: continuous, rounded, accent fill on a muted track.
+    levelbar {
+      margin: 0 4px;
+
+      trough {
+        min-height: 6px;
+        border-radius: 3px;
+        background: $active-bg;
+      }
+
+      block.filled {
+        border-radius: 3px;
+        background: $accent;
+      }
+
+      block.empty {
+        background: transparent;
+      }
+    }
+  }
+
+  // "System monitor (btop)" launcher.
+  qs-monitor {
+    margin-top: 4px;
+    padding: 8px 10px;
+    border-radius: calc(#{$radius} - 2px);
+    background: $active-bg;
+    color: $fg;
+    font-weight: bold;
+
+    image {
+      -gtk-icon-size: 16px;
+    }
+
+    &:hover {
+      background: $accent;
+      color: $accent-fg;
+
+      image {
+        color: $accent-fg;
+      }
+    }
+  }
+}

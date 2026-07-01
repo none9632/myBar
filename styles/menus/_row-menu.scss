@@ -1,0 +1,21 @@
+@use "../abstracts/variables" as *;
+
+// ── Inline row context menu (Wi-Fi networks + Bluetooth devices) ───────────────
+
+row-menu {
+  padding: 2px 8px 6px 36px;
+
+  row-menu-item {
+    padding: 6px 12px;
+    border-radius: calc(#{$radius} - 4px);
+    color: $fg;
+
+    image {
+      -gtk-icon-size: 16px;
+    }
+
+    &:hover {
+      background: $active-bg;
+    }
+  }
+}

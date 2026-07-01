@@ -1,0 +1,29 @@
+// ── myBar stylesheet entry ─────────────────────────────────────────────────────
+// Thin barrel: pulls in every partial. Each partial `@use`s abstracts/variables on
+// its own for the theme tokens, so this file only wires them together. The order
+// below mirrors the original monolithic style.scss so the compiled cascade is
+// unchanged; add new widgets by dropping a partial in the matching folder and
+// `@use`-ing it here.
+
+// Bar
+@use "base/panels";
+@use "bar/workspaces";
+@use "bar/modules";
+@use "bar/system-tray";
+@use "bar/qs-button";
+
+// Menus & popovers
+@use "menus/tray-menu";
+@use "menus/bar-menu";
+@use "menus/updates-menu";
+@use "menus/calendar";
+@use "menus/row-menu";
+
+// Quick Settings
+@use "quicksettings/overlay";
+@use "quicksettings/hardware";
+@use "quicksettings/detail-page";
+
+// Shared components
+@use "components/scrollbar";
+@use "components/toggle-switch";

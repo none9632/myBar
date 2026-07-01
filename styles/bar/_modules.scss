@@ -1,0 +1,123 @@
+@use "../abstracts/variables" as *;
+
+// ── Right-bar modules ─────────────────────────────────────────────────────────
+// Each module is a rounded chip with its own colour tint + coloured icon, adapted
+// from the user's waybar (doom-one): language=purple, updates=brown,
+// battery=cyan, clock=blue.
+
+kb-layout,
+updates,
+battery,
+clock,
+status-indicators {
+  padding: 2px 10px;
+  min-height: $content-height;
+}
+
+kb-layout {
+  background: $ramp-2; // $purple
+  kb-icon {
+    font-weight: normal;
+    color: $purple;
+    font-size: 18px;
+    margin-top: 1px;
+    margin-right: 2px;
+  }
+}
+
+updates {
+  background: $ramp-3;
+  // Now a button (drops the updates list) — flatten the theme's button chrome so
+  // it still reads as a flush chip, like `clock`.
+  border: none;
+  box-shadow: none;
+  outline: none;
+  border-radius: 0;
+
+  updates-icon {
+    font-family: "MyFont";
+    font-size: 18px;
+    font-weight: normal;
+    color: $brown;
+    margin-right: 2px;
+  }
+
+  &:hover {
+    background: $ramp-6;
+    box-shadow: inset 0 0 0 2px $ramp-8;
+  }
+}
+
+battery {
+  background: $ramp-4;
+  battery-icon {
+    font-family: "MyFont";
+    font-size: 18px;
+    font-weight: normal;
+    color: $cyan;
+    margin-right: 2px;
+  }
+}
+
+clock {
+  background: $ramp-1;
+  // Now a button (drops the calendar) — flatten the theme's chrome so it still
+  // reads as a flush chip.
+  border: none;
+  box-shadow: none;
+  outline: none;
+  border-radius: 0;
+
+  time {
+    font-weight: bold;
+    color: $fg;
+  }
+
+  date {
+    color: $subtext;
+  }
+
+  &:hover {
+    background: $ramp-4;
+    box-shadow: inset 0 0 0 2px $ramp-6;
+  }
+}
+
+// At-a-glance status icons (Wi-Fi/BT/VPN/airplane/mic): neutral chip; the icons
+// keep the foreground colour since they convey live state, not a category.
+status-indicators {
+  background: $ramp-6;
+  padding: 0;
+  border-radius: 3px 0px 0px 3px;
+
+  // Size only — colour is inherited ($fg from the panel window).
+  image {
+    -gtk-icon-size: 16px;
+  }
+
+  // Each indicator is a flat button (Wi-Fi/BT/VPN open a settings menu, the mic
+  // toggles mute). Strip the theme's chrome so each reads as a bare icon, with an
+  // accent outline on hover — visible on any wallpaper, and it leaves the icons and
+  // the glassy fill untouched.
+  button {
+    background: none;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 2px 8px;
+    border-radius: 0;
+    color: $fg;
+
+    &:hover {
+      background: $ramp-9;
+      box-shadow: inset 0 0 0 2px $ramp-11;
+    }
+
+    &.wifi {
+      border-radius: 3px 0px 0px 3px;
+    }
+  }
+}

@@ -1,0 +1,71 @@
+@use "sass:map";
+
+// ── Themes ───────────────────────────────────────────────────────────────────
+
+$themes: (
+  "doom-one": (
+    "bg":        rgba(28, 37, 42, 0.8),   // #2b303b
+    "fg":        #cad0da,
+    "subtext":   #8b919e,
+    "active-bg": rgba(54, 72, 82, 0.8), // #51afef @ 18%
+    "accent":    #51afef,
+    "accent-fg": #1c252a,
+    "radius":    8px,
+  )
+);
+
+// ── Active theme (change this to switch) ─────────────────────────────────────
+
+$active-theme: "doom-one";
+
+// ── Extract variables ─────────────────────────────────────────────────────────
+
+$t:         map.get($themes, $active-theme);
+$bg:        map.get($t, "bg");
+$fg:        map.get($t, "fg");
+$subtext:   map.get($t, "subtext");
+$active-bg: map.get($t, "active-bg");
+$accent:    map.get($t, "accent");
+$accent-fg: map.get($t, "accent-fg");
+$radius:    map.get($t, "radius");
+
+// ── Font ──────────────────────────────────────────────────────────────────────
+// Font family for both panels and the Quick Settings overlay. Change this one
+// value to restyle all of them.
+
+$font: "Inter";
+
+// ── Accent palette (doom-one) for per-module tints and coloured icons ─────────
+
+$red:    #ff6c6b;
+$green:  #98be65;
+$orange: #ffaf00;
+$blue:   #51afef;
+$cyan:   #46d9ff;
+$purple: #d499e5;
+$brown:  #c38a48;
+
+// ── Right-bar brightness ramp ─────────────────────────────────────────────────
+// A subtle ladder right → left following the panel order: qs-button matches the
+// panel background and each block toward the left gets 3% brighter, up to
+// status-indicators. (kb-layout keeps its purple accent and is skipped.)
+$ramp-0: $bg;                       // qs-button (= panel bg)
+$ramp-1: rgba(32, 43, 49, 0.8);     // clock (darkest of the ramp)
+$ramp-2: rgba(37, 49, 55, 0.8);     // kb-layout
+$ramp-3: rgba(41, 54, 62, 0.8);     // updates
+$ramp-4: rgba(46, 60, 68, 0.8);     // battery
+$ramp-5: rgba(50, 66, 75, 0.8);     // system-tray
+$ramp-6: rgba(54, 72, 82, 0.8);     // status-indicators
+$ramp-7: rgba(58, 78, 89, 0.8);     // ramp-6 + (4, 6, 7)
+$ramp-8: rgba(62, 84, 96, 0.8);     // ramp-7 + (4, 6, 7)
+$ramp-9: rgba(66, 90, 103, 0.8);    // ramp-8 + (4, 6, 7)
+$ramp-10: rgba(70, 96, 110, 0.9);    // ramp-9 + (4, 6, 7)
+$ramp-11: rgba(74, 100, 117, 0.8);    // ramp-9 + (4, 6, 7)
+
+// ── Shared sizes ──────────────────────────────────────────────────────────────
+
+$content-height: 28px; // height of the pills/buttons inside each panel
+// Shared inner height for BOTH panels. It must be >= the tallest child on either
+// side (the right bar's 20px glyph chips drive this) so that min-height — not the
+// content — decides the box height; that's what keeps the two bars equal.
+$bar-height: 32px;

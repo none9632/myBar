@@ -1,0 +1,27 @@
+@use "../abstracts/variables" as *;
+
+// ── Panels ──────────────────────────────────────────────────────────────────
+// The two bar windows and their shared inner box. min-height (not content) drives
+// the box height so both bars stay equal — see $bar-height in _variables.scss.
+
+window.LeftPanel,
+window.RightPanel {
+  background: transparent;
+  color: $fg;
+  font-family: $font;
+  font-weight: bold;
+}
+
+left-panel-inner,
+right-panel-inner {
+  border-radius: 3px;
+  padding: 0;
+  min-height: $bar-height;
+  color: $fg;
+  margin: 10px;
+  box-shadow: 4px 4px 6px rgba(0, 0, 0, 0.48);
+}
+
+left-panel-inner {
+  background: $ramp-0;
+}

@@ -48,8 +48,8 @@ function QuickSettingsContent(props: {
 // ── Pinned overlay window ─────────────────────────────────────────────────────
 
 // Where the Quick Settings panel sits relative to the bar. Keep BAR_INSET and
-// BAR_HEIGHT in sync with the right panel in style.scss (the `margin` on
-// *-panel-inner and $bar-height) — QS_GAP is the one knob you normally touch.
+// BAR_HEIGHT in sync with the right panel in styles/base/_panels.scss (the
+// `margin` on *-panel-inner and $bar-height) — QS_GAP is the one knob you normally touch.
 const BAR_INSET = 10 // = margin on *-panel-inner
 const BAR_HEIGHT = 32 // = $bar-height
 const QS_GAP = 10 // gap between the bottom of the bar and the panel

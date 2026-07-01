@@ -215,7 +215,7 @@ export default function LeftPanel(gdkmonitor: Gdk.Monitor) {
   // margin that gives the drop shadow room to render); reserving that too would
   // push windows down twice — once by the bar's own bottom margin, once by
   // Hyprland's gaps_out. Keep BAR_SHADOW_ROOM in sync with the bottom value of
-  // `margin` on *-panel-inner in style.scss.
+  // `margin` on *-panel-inner in styles/base/_panels.scss.
   const BAR_SHADOW_ROOM = 10
   // Astal maps the window synchronously at construction, so connecting to "map"
   // would miss the event. Poll on a short timeout instead until the surface has

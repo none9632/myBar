@@ -27,7 +27,7 @@ function IndicatorMenu(props: {
       name={props.name}
       gdkmonitor={props.gdkmonitor}
       // Tag each trigger with its name so it can be styled on its own (see the
-      // `status-indicators button.<name>` rules in style.scss).
+      // `status-indicators button.<name>` rules in styles/bar/_modules.scss).
       buttonClass={props.name}
       tooltip={props.tooltip}
       visible={props.visible}

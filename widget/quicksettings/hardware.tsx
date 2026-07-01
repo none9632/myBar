@@ -53,7 +53,7 @@ function fmtRate(bps: number): string {
 // (contiguous block ram=U+408E, temp=U+408F–U+4093). CPU and Disk use Font
 // Awesome glyphs from a Nerd Font (microchip U+F2DB, hdd U+F0A0) — written as \u
 // escapes since the raw glyphs don't survive transfer. Their font is set via the
-// `nerd`/`disk` classes in style.scss; the rest render in MyFont.
+// `nerd`/`disk` classes in styles/quicksettings/_hardware.scss; the rest render in MyFont.
 const GLYPH_CPU = "\uf2db"
 const GLYPH_RAM = "䂎"
 // Cold → hot. Reorder if the thermometer fill looks inverted.

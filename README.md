@@ -27,7 +27,13 @@ exec-once = ags run
 - `app.ts` — точка входа
 - `widget/` — виджеты
 - `lib/` — утилиты
-- `style.scss` — стили
+- `styles/` — стили, разбитые на партиалы (точка входа `styles/main.scss`):
+  - `abstracts/` — тема, палитра, размеры
+  - `base/` — панели
+  - `bar/` — модули бара (workspaces, tray, clock…)
+  - `menus/` — попапы и меню
+  - `quicksettings/` — оверлей Quick Settings и detail-страницы
+  - `components/` — переиспользуемые куски (scrollbar, toggle-switch)
 
 ## Лицензия
 

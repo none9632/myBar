@@ -1,0 +1,30 @@
+@use "../abstracts/variables" as *;
+
+// ── Bar menus ─────────────────────────────────────────────────────────────────
+// Status-indicator menus (Wi-Fi/BT/VPN) and the clock calendar open in their own
+// overlay window (like Quick Settings) that drops from under the bar button, for
+// the same slide+fade on open AND close. The window is transparent; the card
+// paints the dark glass. Being its own window, the content escapes the bar's
+// bold/icon-colour rules, so (like window.QuickSettings) we only set the font here.
+
+window.BarMenu {
+  background: transparent;
+  font-family: $font;
+}
+
+bar-menu-card {
+  background: $bg;
+  border-radius: $radius;
+  padding: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  color: $fg;
+
+  // Fades in together with the Revealer slide (.shown tracks the reveal state);
+  // keep this duration in sync with QS_ANIM_MS, like quick-settings-wrapper.
+  opacity: 0;
+  transition: opacity 250ms ease;
+
+  &.shown {
+    opacity: 1;
+  }
+}

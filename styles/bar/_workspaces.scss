@@ -1,0 +1,32 @@
+@use "../abstracts/variables" as *;
+
+workspaces {
+  workspace-btn {
+    border-radius: 3px;
+    min-width: $content-height;
+    min-height: $content-height;
+    margin: 0;
+    padding: 0;
+    color: $fg;
+    // The active workspace gets the sliding accent fill behind it (ws-pill,
+    // animated from LeftPanel.tsx). Here we only ease the number colour; the
+    // active number is dark so it reads on the accent fill.
+    transition: color 200ms ease;
+
+    &:hover {
+      color: $fg;
+    }
+
+    &.active {
+      color: $accent-fg;
+    }
+  }
+}
+
+// Sliding accent fill behind the active workspace. Position and width are
+// animated in LeftPanel.tsx (margin-start + width-request via the frame clock);
+// this rule only paints it.
+ws-pill {
+  background: $accent;
+  border-radius: 3px;
+}

@@ -74,7 +74,7 @@ export function ControlSlider(props: {
 // A styled button rather than GtkSwitch: GtkSwitch flips its `:checked` colour
 // only after the knob finishes sliding, which desynced the colour from the knob.
 // Here a single `.on`/`.off` class drives both, so they animate in lockstep (see
-// style.scss `toggle-switch`).
+// styles/components/_toggle-switch.scss `toggle-switch`).
 //
 // `active` is read from a poll or a D-Bus binding that can lag the click by
 // seconds — a VPN service restart, or the Wi-Fi/BT radio powering up. Left as-is
@@ -84,7 +84,7 @@ export function ControlSlider(props: {
 // in and out to show it's working, clearing both the moment the real state confirms
 // — or after a safety timeout, in case the operation failed and the state never arrives.
 export function ToggleSwitch(props: { active: Accessor<boolean>; onToggle: () => void }) {
-  const POP_MS = 260 // press-pop keyframe length; kept in sync with style.scss
+  const POP_MS = 260 // press-pop keyframe length; kept in sync with styles/components/_toggle-switch.scss
   // The requested state while we wait for `active` to confirm it; null once settled.
   const [pending, setPending] = createState<boolean | null>(null)
   let timer: ReturnType<typeof setTimeout> | null = null

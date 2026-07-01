@@ -1,0 +1,49 @@
+@use "../abstracts/variables" as *;
+
+// ── List scrollbars (Wi-Fi / Bluetooth / VPN / updates lists) ──────────────────
+// A slim, rounded slider themed like the chips, replacing GTK's default bar.
+// Overlay scrolling (GTK default) auto-hides it: it fades in on scroll/hover and
+// out when idle, floating over the right edge of the rows.
+detail-list,
+updates-list {
+  scrollbar {
+    background: transparent;
+    border: none;
+    // The theme reserves the gutter via the scrollbar's own min-width + padding,
+    // so min-width on the slider alone can't make it thinner — zero these too.
+    min-width: 0;
+    padding: 0;
+    margin-left: -9px;
+    margin-top: -9px;
+    margin-bottom: -9px;
+
+    trough {
+      background: transparent;
+      border: none;
+      padding: 0;
+      min-width: 8px;
+      margin-left: -6px;
+      margin-right: -8px;
+    }
+
+    slider {
+      min-width: 8px;
+      min-height: 28px;
+      // The theme also pads the slider's width with a margin (and a transparent
+      // border for a bigger grab area); drop both so min-width actually drives it.
+      margin: 0;
+      border: none;
+      border-radius: 2px;
+      background: $ramp-7;
+      transition: background-color 150ms ease;
+
+      &:hover {
+        background: $ramp-10;
+      }
+
+      &:active {
+        background: $ramp-10;
+      }
+    }
+  }
+}
