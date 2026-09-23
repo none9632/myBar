@@ -5,7 +5,8 @@
 // Overlay scrolling (GTK default) auto-hides it: it fades in on scroll/hover and
 // out when idle, floating over the right edge of the rows.
 detail-list,
-updates-list {
+updates-list,
+spotlight-results {
   scrollbar {
     background: transparent;
     border: none;

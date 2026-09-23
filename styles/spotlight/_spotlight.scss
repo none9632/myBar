@@ -1,0 +1,101 @@
+@use "../abstracts/variables" as *;
+
+// ── Spotlight launcher ─────────────────────────────────────────────────────────
+// macOS-Spotlight-style launcher: a centred card with a big search field over a
+// list of results. Opened on demand via `ags request spotlight` (a Hyprland
+// keybind), never shown at startup. Its own window, so it escapes the bar's
+// bold/icon-colour rules — only the font is set here, like window.QuickSettings.
+
+window.Spotlight {
+  background: transparent;
+  font-family: $font;
+}
+
+// The floating card. Fades in via the `.shown` class (toggled a tick after the
+// window maps); keep this duration in sync with ANIM_MS in Spotlight.tsx.
+spotlight-card {
+  min-width: 780px;
+  background: $bg;
+  border-radius: 6px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  color: $fg;
+
+  opacity: 0;
+  transition: opacity 180ms ease;
+
+  &.shown {
+    opacity: 1;
+  }
+}
+
+// Search row: leading magnifier + a flattened entry that carries all the type.
+spotlight-search {
+  padding: 8px 12px;
+  // Hairline under the field, separating it from the results.
+  border-bottom: 1px solid rgba($subtext, 0.22);
+
+  image {
+    -gtk-icon-size: 20px;
+    color: $subtext;
+  }
+
+  spotlight-entry {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 0;
+    min-height: 0;
+    font-size: 1.4em;
+    color: $fg;
+    caret-color: $accent;
+
+    > text > placeholder {
+      color: $subtext;
+      opacity: 1;
+    }
+  }
+}
+
+// Shown in place of the list when a query matches nothing.
+spotlight-empty {
+  color: $subtext;
+  padding: 10px 14px;
+}
+
+spotlight-results {
+  background: transparent;
+  margin-top: 4px;
+}
+
+// One result: icon + name/description, highlighted in accent when it's the active
+// row (keyboard selection or hover — both drive the same `.selected` class).
+spotlight-result {
+  padding: 8px 12px;
+  // border-radius: calc(#{$radius} - 2px);
+  border-radius: 4px;
+  color: $fg;
+
+  spotlight-result-icon {
+    -gtk-icon-size: 32px;
+  }
+
+  spotlight-result-name {
+    font-weight: bold;
+  }
+
+  spotlight-result-desc {
+    font-size: 0.82em;
+    color: $subtext;
+  }
+
+  &.selected {
+    background: $active-bg;
+
+    // spotlight-result-name,
+    // spotlight-result-desc {
+    //   color: $accent-fg;
+    // }
+  }
+}

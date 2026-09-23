@@ -24,6 +24,9 @@
 @use "quicksettings/hardware";
 @use "quicksettings/detail-page";
 
+// Spotlight launcher
+@use "spotlight/spotlight";
+
 // Shared components
 @use "components/scrollbar";
 @use "components/toggle-switch";
