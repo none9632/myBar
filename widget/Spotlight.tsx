@@ -1,36 +1,31 @@
 import app from "ags/gtk4/app"
 import { Astal, Gtk, Gdk } from "ags/gtk4"
 import GLib from "gi://GLib"
-import Pango from "gi://Pango?version=1.0"
-import AstalApps from "gi://AstalApps?version=0.1"
-import { Accessor, createComputed, createState, For } from "gnim"
+import { createComputed, createState, For } from "gnim"
 import { forceLatinLayout } from "../lib/keyboard"
+import { search } from "../lib/spotlight/registry"
+import type { SpotlightItem } from "../lib/spotlight/types"
+import ResultRow from "./spotlight/ResultRow"
 
-// macOS-Spotlight-style launcher (Phase 1: application launcher only).
+// macOS-Spotlight-style launcher.
+//
+// This file owns the *shell*: the window, the search field, selection and the
+// open/close animation. It knows nothing about what it lists — rows come from the
+// providers behind `lib/spotlight/registry`, and activating one calls back into
+// whichever provider produced it.
 //
 // Like Quick Settings, the window is created once at startup but stays unmapped;
 // it's shown on demand — here only via `ags request spotlight` (a Hyprland
 // keybind), with no bar trigger. Open/close state and the query/result model live
 // at module scope so a single instance drives everything and `toggleSpotlight`
 // stays callable from app.ts.
-//
-// Future phases add more providers (calculator, files, windows, clipboard, …); the
-// AstalApps query below would then become one provider among several behind a
-// shared interface.
 
-// Only the *query* results are capped — an empty query lists every app, so the
-// launcher doubles as a browsable menu (scroll or arrow down through all of them).
-const MAX_QUERY_RESULTS = 8
 // Open/close fade length; keep in sync with the `.shown` transition in
 // styles/spotlight/_spotlight.scss.
 const ANIM_MS = 180
 
-// Reads and indexes .desktop files, with fuzzy scoring and a persisted launch
-// frequency (used to rank the default list on an empty query).
-const apps = new AstalApps.Apps()
-
 const [query, setQuery] = createState("")
-const [results, setResults] = createState<AstalApps.Application[]>([])
+const [results, setResults] = createState<SpotlightItem[]>([])
 const [selected, setSelected] = createState(0) // index into `results`
 const [mapped, setMapped] = createState(false) // window shown (stays up during the fade)
 const [shown, setShown] = createState(false) // drives the `.shown` fade
@@ -42,31 +37,21 @@ let entryRef: Gtk.Widget | null = null
 let scrollRef: Gtk.ScrolledWindow | null = null
 let listRef: Gtk.Widget | null = null // the box holding the result rows
 
-// Stable id for `For` keying: the .desktop entry is unique; fall back to the name.
-const keyOf = (a: AstalApps.Application) => a.entry || a.name
-
-// Empty query → every app, most-used first (by AstalApps' persisted frequency,
-// ties broken by name so the tail doesn't reshuffle between opens). Otherwise the
-// fuzzy matches, already sorted best-first and capped to stay glanceable.
-function computeResults(text: string): AstalApps.Application[] {
-  const q = text.trim()
-  if (!q) {
-    return [...apps.get_list()].sort(
-      (a, b) => b.frequency - a.frequency || a.name.localeCompare(b.name),
-    )
-  }
-  return [...apps.fuzzy_query(q)].slice(0, MAX_QUERY_RESULTS)
-}
-
+// Run the query. Providers that answer synchronously land before this returns, so
+// an empty query is populated by the time the window maps; a slow one calls back
+// again later, which is why the selection reset lives here rather than at the
+// call sites.
 function refresh(text: string) {
-  setResults(computeResults(text))
-  setSelected(0)
-  scrollRef?.get_vadjustment().set_value(0)
+  search(text, (items) => {
+    setResults(items)
+    setSelected(0)
+    scrollRef?.get_vadjustment().set_value(0)
+  })
 }
 
 // Keep the selected row inside the viewport. The rows differ in height (only some
-// apps have a description), so the offset is read from the widget itself rather
-// than computed from the index. Called only from `move` — on hover the pointer is
+// carry a subtitle), so the offset is read from the widget itself rather than
+// computed from the index. Called only from `move` — on hover the pointer is
 // already over the row, and scrolling under it would fight the mouse.
 function scrollToSelected() {
   const sw = scrollRef
@@ -98,14 +83,15 @@ function move(delta: number) {
   scrollToSelected()
 }
 
-function launch(a: AstalApps.Application) {
-  a.launch()
+function activate(item: SpotlightItem, alt = false) {
+  if (alt && item.altActivate) item.altActivate()
+  else item.activate()
   closeSpotlight()
 }
 
-function activateSelected() {
-  const a = results.peek()[selected.peek()]
-  if (a) launch(a)
+function activateSelected(alt = false) {
+  const item = results.peek()[selected.peek()]
+  if (item) activate(item, alt)
 }
 
 export function openSpotlight() {
@@ -117,7 +103,7 @@ export function openSpotlight() {
   }
   // Latin input while the launcher is up; the old layout comes back on close.
   restoreLayout = forceLatinLayout()
-  // Fresh session each open: clear the query, seed with the top apps.
+  // Fresh session each open: clear the query, seed with the default results.
   setQuery("")
   refresh("")
   setMapped(true)
@@ -148,53 +134,6 @@ export function closeSpotlight() {
 
 export const toggleSpotlight = () => (isOpen ? closeSpotlight() : openSpotlight())
 
-function ResultRow(props: {
-  app: AstalApps.Application
-  isSelected: Accessor<boolean>
-  onActivate: () => void
-  onHover: () => void
-}) {
-  const a = props.app
-  return (
-    <box
-      cssName="spotlight-result"
-      class={props.isSelected.as((s) => (s ? "selected" : ""))}
-      spacing={12}
-    >
-      {/* A plain box (not a button) so it carries no theme chrome; the gesture
-          makes it clickable and the motion controller lets the mouse drive the
-          same selection the arrow keys do. */}
-      <Gtk.GestureClick onPressed={() => props.onActivate()} />
-      <Gtk.EventControllerMotion onEnter={() => props.onHover()} />
-      <image
-        cssName="spotlight-result-icon"
-        iconName={a.iconName || "application-x-executable"}
-      />
-      <box
-        orientation={Gtk.Orientation.VERTICAL}
-        valign={Gtk.Align.CENTER}
-        hexpand
-        halign={Gtk.Align.START}
-      >
-        <label
-          cssName="spotlight-result-name"
-          label={a.name}
-          halign={Gtk.Align.START}
-          ellipsize={Pango.EllipsizeMode.END}
-        />
-        {a.description ? (
-          <label
-            cssName="spotlight-result-desc"
-            label={a.description}
-            halign={Gtk.Align.START}
-            ellipsize={Pango.EllipsizeMode.END}
-          />
-        ) : null}
-      </box>
-    </box>
-  )
-}
-
 export default function SpotlightWindow(props: { gdkmonitor: Gdk.Monitor }) {
   const { TOP, BOTTOM, LEFT, RIGHT } = Astal.WindowAnchor
   // Sit in the upper third, like macOS Spotlight.
@@ -220,10 +159,11 @@ export default function SpotlightWindow(props: { gdkmonitor: Gdk.Monitor }) {
     >
       {/* CAPTURE phase so navigation keys are handled before the focused entry
           consumes them: Escape closes, Up/Down (and Tab) move the selection,
-          Enter launches. Everything else falls through to the entry for typing. */}
+          Enter activates. Everything else falls through to the entry for typing. */}
       <Gtk.EventControllerKey
         propagationPhase={Gtk.PropagationPhase.CAPTURE}
-        onKeyPressed={(_self, keyval) => {
+        onKeyPressed={(_self, keyval, _code, state) => {
+          const shift = (state & Gdk.ModifierType.SHIFT_MASK) !== 0
           switch (keyval) {
             case Gdk.KEY_Escape:
               closeSpotlight()
@@ -238,7 +178,7 @@ export default function SpotlightWindow(props: { gdkmonitor: Gdk.Monitor }) {
               return true
             case Gdk.KEY_Return:
             case Gdk.KEY_KP_Enter:
-              activateSelected()
+              activateSelected(shift)
               return true
             default:
               return false
@@ -296,12 +236,12 @@ export default function SpotlightWindow(props: { gdkmonitor: Gdk.Monitor }) {
               spacing={2}
               $={(self: Gtk.Widget) => (listRef = self)}
             >
-              <For each={results} id={keyOf}>
-                {(a, index) => (
+              <For each={results} id={(item: SpotlightItem) => item.id}>
+                {(item, index) => (
                   <ResultRow
-                    app={a}
+                    item={item}
                     isSelected={createComputed(() => selected() === index())}
-                    onActivate={() => launch(a)}
+                    onActivate={() => activate(item)}
                     onHover={() => setSelected(index.peek())}
                   />
                 )}

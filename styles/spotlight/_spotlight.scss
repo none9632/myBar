@@ -90,6 +90,17 @@ spotlight-result {
     color: $subtext;
   }
 
+  // Right-hand tail naming the source ("Run") or the Enter action ("⏎ copy").
+  // Tinted from $subtext rather than $active-bg so it stays readable on the
+  // selected row, which uses $active-bg itself.
+  spotlight-result-badge {
+    font-size: 0.78em;
+    color: $subtext;
+    background: rgba($subtext, 0.16);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+
   &.selected {
     background: $active-bg;
 
