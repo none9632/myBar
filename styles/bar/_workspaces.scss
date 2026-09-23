@@ -8,18 +8,20 @@ workspaces {
     margin: 0;
     padding: 0;
     color: $fg;
-    // The active workspace gets the sliding accent fill behind it (ws-pill,
-    // animated from LeftPanel.tsx). Here we only ease the number colour; the
-    // active number is dark so it reads on the accent fill.
-    transition: color 200ms ease;
-
+    // No colour transition here any more. The number that reads dark on the
+    // accent fill is not this one: a second, clipped copy of the whole row is
+    // painted on top of the fill (see `.lit` below and syncMask in
+    // LeftPanel.tsx), so the recolouring follows the fill's edge exactly instead
+    // of switching per button. Easing it here would only smear that edge.
     &:hover {
       color: $fg;
     }
+  }
 
-    &.active {
-      color: $accent-fg;
-    }
+  // The copy that shows through the fill's rectangle. Identical geometry to the
+  // row above — same cssName, same widgets — so the two align pixel for pixel.
+  &.lit workspace-btn {
+    color: $accent-fg;
   }
 }
 
@@ -29,4 +31,10 @@ workspaces {
 ws-pill {
   background: $accent;
   border-radius: 3px;
+}
+
+// The window the lit copy shows through: chrome-free, just a clip.
+ws-mask {
+  background: transparent;
+  border: none;
 }

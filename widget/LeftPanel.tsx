@@ -51,6 +51,21 @@ function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
 }
 const easeMacos = cubicBezier(0.25, 1.0, 0.5, 1.0)
 
+// Hyprland 0.55 moved the config — and the IPC — to Lua: `dispatch <payload>`
+// is evaluated as `hl.dispatch(<payload>)`, so the old string dispatchers
+// ("workspace 3", "focuswindow address:…") are now Lua syntax errors that fail
+// silently apart from a line in the log. Astal's `client.dispatch()` still
+// builds that old form, so this sends a raw message carrying a Lua expression
+// instead. The dispatcher API is `hl.dsp.*` — see
+// /usr/share/hypr/stubs/hl.meta.lua, and config/hypr/hyprland.lua in
+// mydotfiles for examples.
+//
+// The null callback is required: this binding is not promisified, so calling it
+// with one argument throws. Nothing here needs the reply — hyprland reports
+// "error: …" in-band anyway.
+const dispatch = (hypr: Hyprland.Hyprland, lua: string) =>
+  hypr.message_async(`dispatch ${lua}`, null)
+
 function Workspaces() {
   const hypr = Hyprland.get_default()
   if (!hypr) return <box cssName="workspaces" />
@@ -64,6 +79,7 @@ function Workspaces() {
   let overlay: Gtk.Widget | null = null
   let row: Gtk.Widget | null = null
   let pill: Gtk.Widget | null = null
+  let clip: Gtk.ScrolledWindow | null = null
   let tick = 0
   let placed = false
 
@@ -72,6 +88,28 @@ function Workspaces() {
   // width (otherwise it collapses to the fill's own size).
   const linkMeasure = () => {
     if (overlay && row) (overlay as Gtk.Overlay).set_measure_overlay(row, true)
+  }
+
+  // Keep the mask on the fill. The numbers are rendered twice: the row below in
+  // the idle colour, and a second, dark copy on top clipped to exactly this
+  // rectangle. So a number is repainted precisely as far as the fill has covered
+  // it — the ones the fill only passes over recolour and change back mid-slide,
+  // instead of staying light on top of the accent. Called from the same frame
+  // callback that moves the fill, so the two can never drift apart.
+  const syncMask = (x: number, w: number) => {
+    if (!clip || !row) return
+    // Window position and size…
+    clip.margin_start = Math.round(x)
+    clip.width_request = Math.round(w)
+    // …and the copy scrolled by the same amount, so what shows through the window
+    // is the numbers at their real positions rather than the start of the row.
+    clip.get_hadjustment().set_value(Math.round(x))
+    // The copy is allocated its natural height inside the viewport, while the
+    // real row stretches to the overlay. Left alone it comes out 4px shorter and
+    // its numbers sit that much higher, which reads as a jitter the moment the
+    // fill slides over them.
+    const h = row.get_height()
+    if (h > 0 && litRow.height_request !== h) litRow.height_request = h
   }
 
   const boundsOf = (btn: Gtk.Widget): [number, number] | null => {
@@ -94,8 +132,11 @@ function Workspaces() {
       if (t0 < 0) t0 = clock.get_frame_time()
       const p = Math.min(1, (clock.get_frame_time() - t0) / (WS_ANIM_MS * 1000))
       const e = easeMacos(p)
-      w.margin_start = Math.round(fromX + (toX - fromX) * e)
-      w.width_request = Math.round(fromW + (toW - fromW) * e)
+      const x = fromX + (toX - fromX) * e
+      const width = fromW + (toW - fromW) * e
+      w.margin_start = Math.round(x)
+      w.width_request = Math.round(width)
+      syncMask(x, width)
       if (p >= 1) {
         tick = 0
         return false
@@ -126,6 +167,7 @@ function Workspaces() {
         pill.margin_start = Math.round(tb[0])
         pill.width_request = Math.round(tb[1])
         pill.visible = true
+        syncMask(tb[0], tb[1])
         placed = true
       } else {
         startTween(tb[0], tb[1])
@@ -134,6 +176,21 @@ function Workspaces() {
     }
     if (step()) GLib.timeout_add(GLib.PRIORITY_DEFAULT, 8, step)
   }
+
+  // The masked copy of the numbers. Same widgets, same CSS — so it measures
+  // identically to the row below and the two line up — but painted in the on-fill
+  // colour and not clickable.
+  const litRow = (
+    <box cssName="workspaces" class="lit">
+      <For each={workspaces} id={(ws) => ws.id}>
+        {(ws) => (
+          <button cssName="workspace-btn">
+            <label label={`${ws.id}`} />
+          </button>
+        )}
+      </For>
+    </box>
+  ) as Gtk.Widget
 
   focusedId.subscribe(aim) // focus change → slide to it
   workspaces.subscribe(aim) // ws added/removed → reflow + slide
@@ -170,7 +227,7 @@ function Workspaces() {
             <button
               cssName="workspace-btn"
               class={focusedId.as((id) => (id === ws.id ? "active" : ""))}
-              onClicked={() => hypr.dispatch("workspace", `${ws.id}`)}
+              onClicked={() => dispatch(hypr, `hl.dsp.focus({ workspace = ${ws.id} })`)}
               $={(self: Gtk.Widget) => {
                 btns.set(ws.id, self)
                 onCleanup(() => btns.delete(ws.id))
@@ -181,6 +238,29 @@ function Workspaces() {
           )}
         </For>
       </box>
+      {/* Overlay (topmost): the same numbers in the on-fill colour, shown through a
+          window the size of the fill, so only the part the fill covers is
+          repainted. Input passes through to the real buttons underneath.
+
+          A scrolledwindow rather than a box with overflow:hidden, because a box
+          takes its natural width from its child: the window would then stretch
+          from the fill to the end of the row and darken every number to the right
+          of it. A scrolledwindow's natural width is its own (propagate-natural-
+          width stays off), so width-request really sets the size — and scrolling
+          gives the offset without negative coordinates. */}
+      <scrolledwindow
+        cssName="ws-mask"
+        $type="overlay"
+        halign={Gtk.Align.START}
+        valign={Gtk.Align.FILL}
+        canTarget={false}
+        hscrollbarPolicy={Gtk.PolicyType.EXTERNAL}
+        vscrollbarPolicy={Gtk.PolicyType.EXTERNAL}
+        $={(self: Gtk.ScrolledWindow) => {
+          clip = self
+          self.set_child(litRow)
+        }}
+      />
     </overlay>
   )
 }
