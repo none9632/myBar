@@ -16,6 +16,13 @@ workspaces {
     &:hover {
       color: $fg;
     }
+
+    // A chip whose width is being animated open or shut (see LeftPanel.tsx).
+    // The css minimum pins the slot at full width, so it has to step aside for
+    // as long as the animation drives the size itself.
+    &.sizing {
+      min-width: 0;
+    }
   }
 
   // The copy that shows through the fill's rectangle. Identical geometry to the
