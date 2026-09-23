@@ -27,6 +27,7 @@ exec-once = ags run
 - `app.ts` — точка входа
 - `widget/` — виджеты
 - `lib/` — утилиты
+- `docs/ROADMAP.md` — план развития
 - `styles/` — стили, разбитые на партиалы (точка входа `styles/main.scss`):
   - `abstracts/` — тема, палитра, размеры
   - `base/` — панели
