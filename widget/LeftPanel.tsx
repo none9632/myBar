@@ -361,10 +361,31 @@ function Workspaces() {
     return [b[0] + (i - j) * b[1], b[1]]
   }
 
+  // A workspace created by the switch being played does not open its slot on a
+  // clock of its own — the fill uncovers it. The chip is only ever as wide as
+  // the fill's leading edge has reached past where that chip will sit, so the
+  // chip's right edge *is* the fill's right edge for the whole of the slide.
+  //
+  // Going 1→3 across an occupied 2, that means the row holds still while the
+  // fill crosses 2, and chip 3 then grows out from nothing exactly as the fill
+  // moves on past it — instead of the slot springing open at the far end and
+  // the fill travelling towards a chip that is already sitting there.
+  //
+  // `at` is where the chip's slot starts, `full` the width it settles at.
+  let reveal: { id: number; at: number; full: number } | null = null
+
   const applyFill = (x: number, w: number) => {
     if (!pill) return
     pill.margin_start = Math.round(x)
     pill.width_request = Math.round(w)
+    if (reveal) {
+      const open = Math.max(0, Math.min(reveal.full, Math.round(x + w - reveal.at)))
+      const a = chipAnim(reveal.id)
+      a.setWidth(open)
+      // The number fades up with the slot, as it does when a chip opens on its
+      // own clock.
+      a.setOpacity(reveal.full > 0 ? open / reveal.full : 1)
+    }
     syncMask(x, w)
   }
 
@@ -405,6 +426,13 @@ function Workspaces() {
     const fromW = snap ? to[1] : pill.width_request > 0 ? pill.width_request : to[1]
     // The chips of this switch pace themselves off how far the fill is going.
     scaleChipsTo(snap ? 0 : Math.abs(to[0] - fromX), to[1])
+    // Hand a chip this switch is creating over to the fill (see `reveal`), but
+    // only when the fill is really travelling towards it: an empty→empty swap
+    // leaves the fill standing still, and a leftward switch grows the chip at
+    // the head of the row, where every other chip shifts along to make room and
+    // the fill's edge is no measure of the gap at all.
+    endReveal(false)
+    if (!snap && to[0] > fromX && isOpening(id)) reveal = { id, at: to[0], full: to[1] }
     if (snap) applyFill(to[0], to[1])
     let t0 = -1
     let idle = 0
@@ -419,6 +447,7 @@ function Workspaces() {
         return true
       }
       applyFill(to[0], to[1])
+      endReveal(true) // arrived: the chip it uncovered is full size
       // The chip's own animation runs on the same frame clock and may well have
       // been serviced before this callback, so `ticks` clearing does not yet mean
       // the layout after it has happened — bounds are only up to date on the next
@@ -431,6 +460,12 @@ function Workspaces() {
       }
       return true
     })
+    // The fill having somewhere to go is proof this switch is not the swap the
+    // reconcile is holding back for, so there is nothing left to wait on — and a
+    // chip cannot be uncovered before it has been built. Last, because reconcile
+    // can reach back into `aim` (a chip dropped without an exit), and a second
+    // `driveFill` landing in the middle of this one would strand its callback.
+    if (reveal?.id === id) flushReconcile()
   }
 
   // Chips animate in and out on the row's frame clock, on the fill's own curve
@@ -487,6 +522,7 @@ function Workspaces() {
   // rebuilt: For drops and re-appends every child on a list change, so bounds
   // read after that are not there yet.
   const startExit = (id: number, from: number | null) => {
+    if (reveal?.id === id) reveal = null // going out again, not coming in
     leaving.add(id)
     const a = chipAnim(id)
     a.setSizing(true)
@@ -529,6 +565,28 @@ function Workspaces() {
     )
   }
 
+  // Has the row still to open this chip? Either it has not been built at all —
+  // the reconcile that creates it is yet to run — or it is mid-growth.
+  const isOpening = (id: number) => {
+    if (leaving.has(id)) return false
+    if (!shown.peek().includes(id)) return true
+    return ticks.has(id) && (anims.get(id)?.sizing.peek() ?? false)
+  }
+
+  // Stop driving a chip from the fill. `arrived` is the fill reaching its
+  // target, where the chip is by definition full size and only wants handing
+  // back to the css. Anything else cut the reveal short — another switch — so a
+  // chip already in the row finishes opening on its own clock from wherever it
+  // had got to, and one not built yet is left to the reconcile, which will now
+  // animate it normally.
+  const endReveal = (arrived: boolean) => {
+    if (!reveal) return
+    const { id, full } = reveal
+    reveal = null
+    if (arrived) settle(id)
+    else if (shown.peek().includes(id) && !leaving.has(id)) startEnter(id, full)
+  }
+
   // The empty→empty switch: hyprland destroys the workspace you left and creates
   // the one you went to, so one chip has to replace another in the very same
   // slot. Collapsing one slot while opening another is wrong for that — it makes
@@ -538,6 +596,7 @@ function Workspaces() {
   // nothing appears to either side, and the number simply turns into the other
   // one where it stands.
   const startSwap = (id: number, from: number) => {
+    if (reveal?.id === id || reveal?.id === from) reveal = null
     const previous = anims.get(from)
     // Mid-swap already (a fast there-and-back): pick the two numbers up where
     // they are actually being drawn rather than snapping them back to the edges.
@@ -645,6 +704,7 @@ function Workspaces() {
     for (const id of fresh) {
       const a = chipAnim(id)
       a.setSizing(true)
+      if (reveal?.id === id) continue // the fill is already sizing this one
       a.setWidth(0)
       a.setOpacity(0)
     }
@@ -652,7 +712,10 @@ function Workspaces() {
     setShown([...live, ...ghosts].sort((a, b) => a - b))
 
     for (const id of starting) startExit(id, widths.get(id) ?? null)
-    for (const id of [...fresh, ...regrown]) startEnter(id, full)
+    for (const id of [...fresh, ...regrown]) {
+      if (reveal?.id === id) continue // opened by the fill, not by a clock
+      startEnter(id, full)
+    }
   }
 
   // Aim the fill at the currently focused workspace. Its button may not exist yet
@@ -735,6 +798,15 @@ function Workspaces() {
   // change; too slow a destroy just falls back to the open/close animation.
   const RECONCILE_COALESCE_MS = 40
   let pending = 0
+  // Run a held-back reconcile now. Used when the fill has shown the change to
+  // be a plain create rather than a swap, so waiting can only delay the chip.
+  const flushReconcile = () => {
+    if (!pending) return
+    GLib.source_remove(pending)
+    pending = 0
+    reconcile()
+  }
+
   const scheduleReconcile = () => {
     if (pending) return
     pending = GLib.timeout_add(GLib.PRIORITY_DEFAULT, RECONCILE_COALESCE_MS, () => {
