@@ -11,13 +11,26 @@ import BarMenu from "./BarMenu"
 const UPDATE_INTERVAL = 30 * 60 * 1000 // 30 minutes
 
 // Official-repo updates via `checkupdates` (no sudo; it syncs a throwaway db) plus
-// AUR updates via `yay -Qua`. Each line is tagged with its source. The pipe into
-// sed keeps the exit status 0 even when a tool finds nothing or is missing, so the
-// poll never reads as a failure.
+// AUR updates via `yay -Qua`. Each line is tagged with its source, and the script
+// always exits 0 so the poll never reads as a failure.
+//
+// `checkupdates` exits 2 when everything is up to date and 1 when it could not
+// check at all (no network, a stale db.lck left by a killed run, missing fakeroot).
+// Both cases print nothing, so without the exit code an outage is indistinguishable
+// from "up to date" — the chip would silently vanish and stay hidden. Anything but
+// 0/2 emits the ERR marker instead, and the transform then keeps the previous state.
+// `yay -Qua` gives us no such signal (it exits 1 both on failure and on "no AUR
+// updates"), so it stays best-effort. Both are wrapped in `timeout` so a hung
+// network call can't leave the subprocess (and the poll) stuck forever.
 const UPDATE_LIST_CMD = [
   "bash",
   "-c",
-  "{ checkupdates 2>/dev/null | sed 's/^/repo /'; yay -Qua 2>/dev/null | sed 's/^/aur /'; }",
+  `out=$(timeout 120 checkupdates 2>/dev/null); rc=$?
+if [ "$rc" = 0 ]; then printf '%s\\n' "$out" | sed 's/^/repo /'
+elif [ "$rc" != 2 ]; then echo ERR
+fi
+timeout 120 yay -Qua 2>/dev/null | sed 's/^/aur /'
+exit 0`,
 ]
 
 interface PkgUpdate {
@@ -27,8 +40,12 @@ interface PkgUpdate {
   aur: boolean
 }
 
-// Lines look like `repo gtk4 1.0-1 -> 1.1-1` / `aur yay 12.0-1 -> 12.1-1`.
-function parseUpdates(out: string): PkgUpdate[] {
+// Lines look like `repo gtk4 1.0-1 -> 1.1-1` / `aur yay 12.0-1 -> 12.1-1`; a lone
+// `ERR` line means the repo check itself failed. Returning `prev` on failure keeps
+// the last known count on the bar instead of dropping to a bogus zero.
+function parseUpdates(out: string, prev: PkgUpdate[] | null): PkgUpdate[] | null {
+  if (out.split("\n").some((l) => l.trim() === "ERR")) return prev
+
   const items: PkgUpdate[] = []
   for (const line of out.split("\n")) {
     const m = line.match(/^(repo|aur)\s+(\S+)\s+(\S+)\s+->\s+(\S+)/)
@@ -150,13 +167,14 @@ function UpdatesPage(props: { updates: Accessor<PkgUpdate[] | null> }) {
 }
 
 export default function Updates(props: { gdkmonitor: Gdk.Monitor }) {
-  // null = not fetched yet (chip shows "…"); [] = checked, none pending (chip
-  // hidden); otherwise the list of pending packages.
+  // null = not fetched yet (chip shows "…"); otherwise the list of pending
+  // packages. The chip stays on the bar at zero and just shows "0" — hiding it
+  // was indistinguishable from the widget being broken.
   const updates = createPoll<PkgUpdate[] | null>(
     null,
     UPDATE_INTERVAL,
     UPDATE_LIST_CMD,
-    (out) => parseUpdates(out),
+    (out, prev) => parseUpdates(out, prev),
   )
 
   return (
@@ -164,7 +182,6 @@ export default function Updates(props: { gdkmonitor: Gdk.Monitor }) {
       name="updates"
       gdkmonitor={props.gdkmonitor}
       buttonCssName="updates"
-      visible={updates.as((u) => u === null || u.length > 0)}
       content={() => <UpdatesPage updates={updates} />}
       button={
         <box spacing={4}>
